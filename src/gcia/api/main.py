@@ -5,7 +5,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from gcia.api.routes import ask, briefing, company, compare, evidence
+from gcia.api.routes import ask, briefing, company, compare, discovery, evidence, trend
 
 app = FastAPI(
     title="Global Company Intelligence Agent API",
@@ -18,6 +18,8 @@ app.include_router(evidence.router)
 app.include_router(compare.router)
 app.include_router(briefing.router)
 app.include_router(ask.router)
+app.include_router(trend.router)
+app.include_router(discovery.router)
 
 _static_dir = pathlib.Path(__file__).parent / "static"
 app.mount("/dashboard", StaticFiles(directory=_static_dir, html=True), name="dashboard")

@@ -18,8 +18,10 @@ Turn fragmented public discussion into evidence-backed company intelligence. A u
 
 ## Code
 
-The initial implementation scaffold lives in `src/gcia/` — see
-[src/README.md](src/README.md) for the layout and how to run it locally.
+The implementation lives in `src/gcia/` — see [src/README.md](src/README.md)
+for the layout and how to run it locally, and
+[docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for exactly
+what's built/tested/verified versus what remains.
 
 ## Repository documentation
 

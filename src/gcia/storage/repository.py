@@ -52,8 +52,8 @@ def update_company_credibility(session: Session, company_id: str, score: float) 
 
 
 def upsert_discussion(session: Session, company_id: str, discussion: Discussion) -> None:
-    if session.get(DiscussionRecord, discussion.discussion_id):
-        return  # idempotent: same discussion_id is never re-inserted (NFR-006)
+    if session.get(DiscussionRecord, (discussion.discussion_id, company_id)):
+        return  # idempotent per (discussion_id, company_id) - NFR-006
     session.add(
         DiscussionRecord(
             discussion_id=discussion.discussion_id,

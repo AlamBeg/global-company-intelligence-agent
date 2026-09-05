@@ -129,10 +129,15 @@ def run(company_id: str, canonical_name: str, source_url: str, connector_name: s
             intent_result = intent.run(discussion, context)
             claims = claim.run(discussion, context)
             for extracted_claim in claims:
+                # claim_id as built by ClaimAgent is scoped only to
+                # discussion_id, which is not unique across companies (two
+                # companies can validly ingest identical content) - rescope
+                # it here, at the point where company context is known.
+                extracted_claim.claim_id = f"{company.company_id}:{extracted_claim.claim_id}"
                 repository.save_claim(session, company.company_id, extracted_claim)
 
             evidence = Evidence(
-                evidence_id=f"evidence:{discussion.discussion_id}",
+                evidence_id=f"evidence:{company.company_id}:{discussion.discussion_id}",
                 source_record_id=discussion.discussion_id,
                 original_url=discussion.original_url,
                 platform=discussion.platform,

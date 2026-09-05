@@ -87,6 +87,11 @@ def run(company_id: str) -> dict:
 
         duplicate_clusters = DeduplicationAgent().run(discussions, context)
         for cluster in duplicate_clusters:
+            # cluster_id as built by DeduplicationAgent is scoped only to a
+            # discussion_id, which is not unique across companies - rescope
+            # here where company context is known (same rationale as
+            # evidence_id/claim_id in gcia.ingestion.run_ingestion).
+            cluster.cluster_id = f"{company_id}:{cluster.cluster_id}"
             repository.save_duplicate_cluster(session, company_id, cluster)
 
         # Non-canonical duplicate members are excluded from topic/risk input:
@@ -104,16 +109,21 @@ def run(company_id: str) -> dict:
 
         topic_clusters = naive_topic_clusters(canonical_discussions)
         for cluster in topic_clusters:
+            # topic_id/narrative_id as built by the agents are scoped only
+            # to a discussion_id, not unique across companies - rescope here.
             topic = TopicAgent().run(cluster, context)
             topic.company_id = company_id
+            topic.topic_id = f"{company_id}:{topic.topic_id}"
             repository.save_topic(session, company_id, topic)
 
             narrative = NarrativeAgent().run(cluster, context)
             narrative.company_id = company_id
+            narrative.narrative_id = f"{company_id}:{narrative.narrative_id}"
             repository.save_narrative(session, company_id, narrative)
 
         risk = RiskAgent().run(canonical_discussions, context)
         risk.company_id = company_id
+        risk.risk_id = f"{company_id}:{risk.risk_id}"
         repository.save_risk(session, company_id, risk)
 
         # Real signals we can compute today: originality from the dedup

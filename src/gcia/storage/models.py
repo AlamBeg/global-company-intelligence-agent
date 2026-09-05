@@ -22,10 +22,22 @@ class CompanyRecord(Base):
 
 
 class DiscussionRecord(Base):
+    """Primary key is (discussion_id, company_id), not discussion_id alone.
+
+    discussion_id is content-derived (hash of platform + source-native id),
+    so identical content ingested for two different companies would
+    otherwise collide onto one row and silently get reassigned to whichever
+    company wrote it last. Relevance is inherently per-company (FR-008), so
+    the same content can validly appear once per company it was ingested
+    for, with its own relevance/evidence/topic/risk trail.
+    """
+
     __tablename__ = "discussions"
 
     discussion_id: Mapped[str] = mapped_column(String, primary_key=True)
-    company_id: Mapped[str] = mapped_column(String, ForeignKey("companies.company_id"))
+    company_id: Mapped[str] = mapped_column(
+        String, ForeignKey("companies.company_id"), primary_key=True
+    )
     source_id: Mapped[str] = mapped_column(String)
     original_url: Mapped[str | None] = mapped_column(String, nullable=True)
     url_status: Mapped[str] = mapped_column(String)
@@ -42,12 +54,15 @@ class DiscussionRecord(Base):
 
 
 class RelevanceRecord(Base):
+    """Primary key is (discussion_id, company_id): the same content can be
+    judged relevant to one company and not another (FR-008), so relevance is
+    inherently per-company, not a fact about the content alone.
+    """
+
     __tablename__ = "relevance_assessments"
 
-    discussion_id: Mapped[str] = mapped_column(
-        String, ForeignKey("discussions.discussion_id"), primary_key=True
-    )
-    company_id: Mapped[str] = mapped_column(String)
+    discussion_id: Mapped[str] = mapped_column(String, primary_key=True)
+    company_id: Mapped[str] = mapped_column(String, primary_key=True)
     is_relevant: Mapped[bool] = mapped_column()
     reason: Mapped[str] = mapped_column(Text)
     confidence: Mapped[float] = mapped_column(Float)
@@ -55,11 +70,14 @@ class RelevanceRecord(Base):
 
 
 class SentimentRecord(Base):
+    """Keyed by discussion_id alone: sentiment is a property of the content
+    itself (docs/AI_SCORING_MODEL.md), not the company evaluating it, so
+    sharing one row across companies for identical content is correct, not
+    a collision - unlike RelevanceRecord."""
+
     __tablename__ = "sentiment_assessments"
 
-    discussion_id: Mapped[str] = mapped_column(
-        String, ForeignKey("discussions.discussion_id"), primary_key=True
-    )
+    discussion_id: Mapped[str] = mapped_column(String, primary_key=True)
     overall_label: Mapped[str] = mapped_column(String)
     overall_score: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float)
@@ -107,8 +125,12 @@ class DuplicateClusterRecord(Base):
 class EvidenceRecord(Base):
     __tablename__ = "evidence"
 
+    # evidence_id itself is company-scoped by construction (see
+    # gcia.ingestion.run_ingestion) - discussion_id alone is not unique
+    # across companies, so it is stored as a plain correlation column, not
+    # an enforced foreign key.
     evidence_id: Mapped[str] = mapped_column(String, primary_key=True)
-    discussion_id: Mapped[str] = mapped_column(String, ForeignKey("discussions.discussion_id"))
+    discussion_id: Mapped[str] = mapped_column(String)
     company_id: Mapped[str] = mapped_column(String)
     platform: Mapped[str] = mapped_column(String, default="unknown")
     original_url: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -122,8 +144,10 @@ class EvidenceRecord(Base):
 class ClaimRecord(Base):
     __tablename__ = "claims"
 
+    # claim_id is company-scoped by construction, same rationale as
+    # EvidenceRecord above.
     claim_id: Mapped[str] = mapped_column(String, primary_key=True)
-    discussion_id: Mapped[str] = mapped_column(String, ForeignKey("discussions.discussion_id"))
+    discussion_id: Mapped[str] = mapped_column(String)
     company_id: Mapped[str] = mapped_column(String)
     claim_type: Mapped[str] = mapped_column(String)
     text: Mapped[str] = mapped_column(Text)
