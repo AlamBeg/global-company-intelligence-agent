@@ -76,3 +76,54 @@ Produces concise company intelligence from structured outputs and evidence. It m
 - Bounded context passed to LLMs
 - No direct access to secrets unless required by connector runtime
 - Human review for high-impact ambiguous cases
+
+## Execution model
+
+Twenty-one agent responsibilities do not imply twenty-one chained LLM calls per item, or one long-running agent loop per query. Agents run in three lanes, split by trigger and cadence rather than by org chart, so a failure or slowdown in one lane cannot stall the others (NFR-001) and reprocessing stays cheap and idempotent (NFR-006).
+
+### Lane 1 — Streaming, per item
+
+Trigger: each normalized discussion record, as it arrives off the event bus.
+
+Agents: Normalization, Language, Relevance, Sentiment, Emotion, Intent, Claim, per-item Geography.
+
+Shape: stateless consumer workers, one pool per agent type, horizontally scaled, keyed by `discussion_id`. Each agent is a pure function of `(input, agent_version)`, cached by `(content_hash, agent_version)` — so a prompt or model upgrade only reprocesses new/changed content, not the full history. Low-confidence Relevance/Sentiment outputs route to the human-review queue instead of blocking the pipeline.
+
+### Lane 2 — Batch, per company/window
+
+Trigger: schedule or volume threshold, scoped to `(company_id, time_window)`.
+
+Agents: Deduplication, Topic clustering/labeling, Narrative clustering, Impact, Credibility, Trend, Risk.
+
+Shape: durable workflow-engine jobs (Temporal/Airflow-class), because these agents read a window of already-processed Lane 1 output rather than one record at a time. Each run is versioned (`score_model_version`, `taxonomy_version`) and idempotent per `(company_id, window, version)`, so a retried or re-triggered run does not double-count.
+
+### Lane 3 — On-demand, per query
+
+Trigger: user query, dashboard load, comparison request (FR-031), or briefing export (FR-032).
+
+Agents: Discovery (only invoked when existing coverage is insufficient for the query), Verification, Synthesis/Analyst.
+
+Shape: request/response service with a bounded latency budget (NFR-012). Synthesis is retrieval over already-computed Lane 1/2 outputs and the evidence store — it does not recompute upstream scores.
+
+## Orchestrator responsibilities in practice
+
+The Orchestrator is a control-plane, not a participant in analysis: it starts and tracks Lane 2 workflow runs with retry/backoff, enforces per-run budgets (max discovery queries, max tokens/cost), and exposes circuit-breaker state per connector/agent so one bad source or agent cannot stall Lane 1. It never calls an LLM and never touches source URLs directly.
+
+## Agent interface contract
+
+Every agent — LLM-backed or deterministic — implements the same shape: `run(input: TypedModel, context: RunContext) -> TypedOutput`. `RunContext` carries `trace_id`, `tenant_id`, budget, and pinned model/prompt versions. This uniformity is what lets the Orchestrator retry, log, and dead-letter 21 different agents identically instead of special-casing each one.
+
+LLM-backed agents additionally:
+
+- Return structured output only (JSON-schema/function-calling mode) — never freeform prose passed downstream.
+- Receive bounded context: only the fields the agent needs (e.g., Sentiment never sees engagement/reach), which is also what keeps sentiment independent of impact per the scoring model.
+- Report confidence that is calibrated separately from the model's self-reported certainty (e.g., a small classifier or lookup against that agent's evaluation-set performance for similar inputs).
+- Route every call through the model gateway so model, version, latency, and cost are logged per call against the same `trace_id`.
+
+## Determinism and idempotency
+
+Discussion IDs are deterministic (`hash(platform, source_native_id)`), so re-ingestion never creates duplicate records. Agent outputs are content-addressed by `(input_hash, agent_version)`, so reprocessing after a model or prompt upgrade only recomputes what actually changed.
+
+## Human-in-the-loop routing
+
+A single review queue service — not one per agent — receives low-confidence output from Entity Resolution, Relevance, and Risk. Reviewer decisions write back into the evaluation datasets, closing the feedback loop rather than only fixing the one flagged case.

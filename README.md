@@ -16,6 +16,11 @@ Turn fragmented public discussion into evidence-backed company intelligence. A u
 - Explainable: scores and insights must expose supporting evidence and confidence.
 - Compliance-aware: connectors respect platform APIs, licensing, robots rules, rate limits, privacy requirements, and access controls.
 
+## Code
+
+The initial implementation scaffold lives in `src/gcia/` — see
+[src/README.md](src/README.md) for the layout and how to run it locally.
+
 ## Repository documentation
 
 - [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)

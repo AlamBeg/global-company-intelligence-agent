@@ -76,7 +76,11 @@ All LLM/model calls should go through a versioned model gateway that records mod
 
 The API should expose company profiles, discussions, evidence, topics, sentiment, trends, risks, narratives, source coverage, and monitoring configurations without exposing internal secrets or unrestricted raw connector credentials.
 
-## 9. Multi-tenancy
+The API shall be explicitly versioned per contract. Breaking changes require a new version and a documented deprecation window for the prior one. Access to each endpoint is scoped by role (see Section 9).
+
+## 9. Multi-tenancy and access control
+
+Role-based access control (e.g., viewer, analyst, admin) is enforced at the API layer for all tenants, scoping visibility of raw evidence, risk detail, connector configuration, and exports — not only hidden in the UI.
 
 Tenant isolation should exist at authentication, authorization, data, cache, search, vector, and alerting boundaries if the platform becomes multi-tenant.
 

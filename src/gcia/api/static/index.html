@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GCIA Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0f19;
+    --panel: #121729;
+    --panel-border: #232a41;
+    --text: #e8ebf5;
+    --muted: #8b93ab;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --gray: #6b7280;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0 0 48px;
+  }
+  header {
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .tagline { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .globe { font-size: 26px; }
+  .search-bar { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  input[type="text"], input[type="password"] {
+    background: #1a2036; border: 1px solid var(--panel-border); color: var(--text);
+    padding: 9px 12px; border-radius: 8px; font-size: 14px;
+  }
+  input#companyId { width: 200px; }
+  input#apiKey { width: 160px; }
+  button {
+    background: var(--accent); color: white; border: none; padding: 9px 18px;
+    border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 18px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .big-number { font-size: 32px; font-weight: 700; margin: 6px 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .placeholder {
+    color: var(--muted); font-size: 13px; font-style: italic;
+    padding: 24px 0; text-align: center; border: 1px dashed var(--panel-border); border-radius: 8px;
+  }
+  .donut-row { display: flex; align-items: center; gap: 16px; }
+  .donut { width: 84px; height: 84px; border-radius: 50%; flex-shrink: 0; }
+  .legend { font-size: 13px; }
+  .legend div { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 28px 0 12px; }
+  .discussion {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+  }
+  .discussion .content { flex: 1; }
+  .discussion .excerpt { font-size: 14px; margin: 4px 0 0; color: var(--text); }
+  .discussion .claim { font-size: 12px; color: var(--muted); }
+  .tag {
+    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .tag.positive { background: rgba(34,197,94,.15); color: var(--green); }
+  .tag.negative { background: rgba(239,68,68,.15); color: var(--red); }
+  .tag.neutral { background: rgba(107,114,128,.2); color: #b7bccb; }
+  .open-link {
+    font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; margin-top: 4px; display: inline-block;
+  }
+  .muted { color: var(--muted); }
+  .error { color: var(--red); padding: 16px 0; }
+  .hidden { display: none; }
+  #result { margin-top: 8px; }
+  .ask-card { display: flex; gap: 8px; margin-bottom: 8px; }
+  .ask-card input { flex: 1; }
+  .ask-answer { font-size: 14px; margin-top: 10px; white-space: pre-wrap; }
+  .geo-row { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="globe">🌐</span>
+    <div>
+      <h1>Global Company Intelligence Agent</h1>
+      <div class="tagline">Evidence-backed company intelligence, from public discussion worldwide.</div>
+    </div>
+  </div>
+  <div class="search-bar">
+    <input type="password" id="apiKey" placeholder="X-API-Key (optional)" onchange="saveApiKey()">
+    <input type="text" id="companyId" placeholder="company_id, e.g. acme" onkeydown="if(event.key==='Enter')load()">
+    <button onclick="load()">Analyze</button>
+  </div>
+</header>
+
+<main>
+  <div id="empty" class="placeholder" style="margin-top:40px;">
+    Enter a company_id you've ingested via
+    <code>python -m gcia.ingestion.run_ingestion</code>, then click Analyze.
+    If the API has <code>GCIA_API_KEYS</code> configured, enter a key above first.
+  </div>
+  <div id="result" class="hidden"></div>
+</main>
+
+<script>
+let currentCompanyId = null;
+
+const TEMPLATE = (data) => {
+  const s = data.sentiment;
+  const total = s.positive + s.neutral + s.negative;
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0;
+  const scoreOn100 = s.overall_score !== null ? Math.round((s.overall_score + 1) * 50) : null;
+
+  return `
+    <div class="grid">
+      <div class="card">
+        <h3>Company</h3>
+        <div class="big-number" style="font-size:22px">${escapeHtml(data.canonical_name)}</div>
+        <div class="sub">${escapeHtml(data.company_id)}</div>
+      </div>
+      <div class="card">
+        <h3>Overall Sentiment</h3>
+        <div class="big-number">${scoreOn100 !== null ? scoreOn100 + ' / 100' : 'n/a'}</div>
+        <div class="sub">from ${s.sample_size} scored discussion(s)</div>
+      </div>
+      <div class="card">
+        <h3>Total Discussions</h3>
+        <div class="big-number">${data.discussion_count}</div>
+        <div class="sub">${data.claim_count} claim(s) extracted</div>
+      </div>
+      <div class="card">
+        <h3>Credibility</h3>
+        <div class="big-number">${data.credibility_score !== null && data.credibility_score !== undefined ? data.credibility_score.toFixed(2) : 'n/a'}</div>
+        <div class="sub">not a truth score — signal quality only</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Sentiment Breakdown</h3>
+        <div class="donut-row">
+          ${donut(pct(s.positive), pct(s.negative))}
+          <div class="legend">
+            <div><span class="dot" style="background:var(--green)"></span>Positive ${pct(s.positive)}%</div>
+            <div><span class="dot" style="background:var(--gray)"></span>Neutral ${pct(s.neutral)}%</div>
+            <div><span class="dot" style="background:var(--red)"></span>Negative ${pct(s.negative)}%</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Top Topics</h3>
+        ${topicsHtml(data.topics)}
+      </div>
+      <div class="card">
+        <h3>Narrative &amp; Dedup</h3>
+        ${dedupHtml(data.narrative_dedup, data.narratives)}
+      </div>
+      <div class="card">
+        <h3>Geographic Breakdown</h3>
+        ${geoHtml(data.geography)}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>Risk Summary</h3>
+      ${risksHtml(data.risks)}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>AI Analyst — ask a question about ${escapeHtml(data.canonical_name)}</h3>
+      <div class="ask-card">
+        <input type="text" id="askInput" placeholder="e.g. What are customers complaining about?" onkeydown="if(event.key==='Enter')ask()">
+        <button onclick="ask()">Ask</button>
+      </div>
+      <div id="askResult" class="ask-answer muted">Requires 'analyst' role or above if GCIA_API_KEYS is configured.</div>
+    </div>
+
+    <div class="section-title">Evidence (${data.evidence.length})</div>
+    ${data.evidence.length ? data.evidence.map(evidenceRow).join('') : '<div class="placeholder">No evidence yet — run ingestion for this company.</div>'}
+  `;
+};
+
+const LANE2_HINT = 'Not yet available — run <code>python -m gcia.workflows.run_company_window</code> for this company.';
+
+function topicsHtml(topics) {
+  if (!topics || !topics.length) return `<div class="placeholder">${LANE2_HINT}</div>`;
+  return topics.map(t => `
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin:8px 0;">
+      <span>${escapeHtml(t.label)}</span>
+      <span class="muted">${t.volume} &middot; conf ${t.confidence.toFixed(2)}</span>
+    </div>`).join('');
+}
+
+function dedupHtml(dedup, narratives) {
+  if (!dedup) return `<div class="placeholder">${LANE2_HINT}</div>`;
+  const narrativeLines = (narratives || []).map(n => `
+    <div style="font-size:12px;margin:4px 0;" class="muted">${escapeHtml(n.label)} (${n.size} discussion(s))</div>
+  `).join('');
+  return `
+    <div class="big-number" style="font-size:22px">${dedup.duplicate_clusters}</div>
+    <div class="sub">duplicate cluster(s) &middot; ${dedup.duplicate_discussions_grouped} discussion(s) grouped, not double-counted</div>
+    ${narrativeLines}`;
+}
+
+function geoHtml(geography) {
+  const entries = Object.entries(geography || {});
+  if (!entries.length) return `<div class="placeholder">No geography inferred yet (low-confidence keyword matches only).</div>`;
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries.map(([country, count]) => `
+    <div class="geo-row"><span>${escapeHtml(country)}</span><span class="muted">${count}</span></div>
+  `).join('');
+}
+
+function risksHtml(risks) {
+  if (!risks || !risks.length) return `<div class="placeholder">${LANE2_HINT}</div>`;
+  return risks.map(r => `
+    <div style="font-size:13px;margin:8px 0;">
+      <strong>${escapeHtml(r.category)}</strong> — severity ${r.severity.toFixed(2)}, confidence ${r.confidence.toFixed(2)}
+      <div class="muted">${escapeHtml(r.summary)}</div>
+    </div>`).join('');
+}
+
+function donut(positivePct, negativePct) {
+  const p1 = positivePct;
+  const p2 = positivePct + (100 - positivePct - negativePct); // neutral boundary
+  const gradient = `conic-gradient(var(--green) 0% ${p1}%, var(--gray) ${p1}% ${p2}%, var(--red) ${p2}% 100%)`;
+  return `<div class="donut" style="background:${gradient}"></div>`;
+}
+
+function evidenceRow(e) {
+  const label = (e.claim_supported || '').toLowerCase();
+  const tagClass = label.includes('positive') ? 'positive' : label.includes('negative') ? 'negative' : 'neutral';
+  const labels = e.analytical_labels || {};
+  const emotions = Object.keys(labels.emotions || {});
+  const intents = labels.intents || [];
+  const extra = [
+    emotions.length ? `emotions: ${emotions.join(', ')}` : null,
+    intents.length ? `intent: ${intents.join(', ')}` : null,
+    labels.url_status ? `url ${labels.url_status}` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="discussion">
+      <div class="content">
+        <span class="tag ${tagClass}">${escapeHtml(e.claim_supported || 'unlabeled')}</span>
+        <div class="excerpt">${escapeHtml(e.excerpt)}</div>
+        <div class="claim">confidence ${e.confidence.toFixed(2)}${extra ? ' · ' + escapeHtml(extra) : ''}</div>
+      </div>
+      <a class="open-link" href="${e.original_url || '#'}" target="_blank" rel="noopener">
+        ${e.original_url ? 'Open source ↗' : 'no source URL'}
+      </a>
+    </div>`;
+}
+
+function apiHeaders() {
+  const key = document.getElementById('apiKey').value.trim();
+  return key ? { 'X-API-Key': key } : {};
+}
+
+function saveApiKey() {
+  try { localStorage.setItem('gcia_api_key', document.getElementById('apiKey').value); } catch (e) {}
+}
+
+function restoreApiKey() {
+  try {
+    const saved = localStorage.getItem('gcia_api_key');
+    if (saved) document.getElementById('apiKey').value = saved;
+  } catch (e) {}
+}
+
+async function load() {
+  const id = document.getElementById('companyId').value.trim();
+  const result = document.getElementById('result');
+  const empty = document.getElementById('empty');
+  if (!id) return;
+  currentCompanyId = id;
+
+  empty.classList.add('hidden');
+  result.classList.remove('hidden');
+  result.innerHTML = '<p class="muted">Loading…</p>';
+
+  let res;
+  try {
+    res = await fetch(`/v1/companies/${encodeURIComponent(id)}`, { headers: apiHeaders() });
+  } catch (e) {
+    result.innerHTML = '<p class="error">Could not reach the API.</p>';
+    return;
+  }
+  if (!res.ok) {
+    result.innerHTML = `<p class="error">Error ${res.status}: not found, not ingested yet, or missing/invalid API key.</p>`;
+    return;
+  }
+  const data = await res.json();
+  result.innerHTML = TEMPLATE(data);
+}
+
+async function ask() {
+  const input = document.getElementById('askInput');
+  const out = document.getElementById('askResult');
+  const question = input.value.trim();
+  if (!question || !currentCompanyId) return;
+
+  out.textContent = 'Thinking…';
+  let res;
+  try {
+    res = await fetch(`/v1/companies/${encodeURIComponent(currentCompanyId)}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+      body: JSON.stringify({ question }),
+    });
+  } catch (e) {
+    out.textContent = 'Could not reach the API.';
+    return;
+  }
+  if (!res.ok) {
+    out.textContent = `Error ${res.status} — check your API key/role, or that this company has evidence.`;
+    return;
+  }
+  const data = await res.json();
+  const citations = (data.citations || []).join(', ');
+  out.textContent = `${data.answer}${citations ? '\n\nCitations: ' + citations : ''}\n\nConfidence: ${data.confidence.toFixed(2)}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+restoreApiKey();
+</script>
+</body>
+</html>

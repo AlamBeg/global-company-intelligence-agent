@@ -4,6 +4,7 @@
 
 - Store connector credentials in a managed secrets system.
 - Apply least-privilege access to APIs, storage, queues, and databases.
+- Enforce role-based access control (viewer, analyst, admin) at the API layer for raw evidence, risk detail, connector configuration, and exports — not only in the UI.
 - Encrypt data in transit and at rest where appropriate.
 - Isolate tenants if multi-tenancy is enabled.
 - Audit administrative and data-access events.

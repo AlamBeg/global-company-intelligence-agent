@@ -296,6 +296,18 @@ Where source/licensing permits, the platform shall support historical data analy
 
 The system shall support scheduled/streaming collection where source capabilities permit, with clear freshness timestamps.
 
+### FR-031 — Competitive comparison
+
+The system shall support side-by-side comparison of a target company against one or more named competitors across sentiment, volume, topics, impact, and risk for a shared time window, using the same underlying evidence and scoring pipeline for each entity.
+
+### FR-032 — Executive briefing export
+
+Users shall be able to export a company intelligence summary (e.g., PDF, slide, or CSV format) suitable for executive/investor briefing. Exports must preserve evidence links, confidence values, score versions, and coverage/limitation disclosures rather than presenting bare numbers.
+
+### FR-033 — API versioning
+
+The API shall expose an explicit version identifier per endpoint/contract. Breaking changes shall be introduced under a new version with a documented deprecation period for prior versions.
+
 ---
 
 ## 4. Multi-agent requirements
@@ -394,6 +406,14 @@ Connectors shall enforce platform terms, API policies, licensing, regional restr
 
 Important scoring and synthesis decisions shall be reproducible from stored inputs, model/version metadata, prompts/configuration, and evidence references where legally and technically appropriate.
 
+### NFR-011 Access control
+
+The platform shall enforce role-based access control for users and API clients (e.g., viewer, analyst, admin), scoping visibility of raw evidence, risk detail, connector configuration, and export capability by role. Roles shall be enforced at the API layer, not only in the UI.
+
+### NFR-012 Performance targets
+
+The system shall define and track concrete performance targets per environment, at minimum: dashboard/API read-path p95 latency, end-to-end ingestion-to-searchable latency, and connector-collection lag. Targets are configurable per deployment but must be explicit rather than left undefined, so "acceptable performance" is measurable.
+
 ---
 
 ## 7. Data model requirements
@@ -490,6 +510,8 @@ The MVP is acceptable when all of the following are true:
 12. Connector failures, processing failures, and model errors are observable.
 13. API/source restrictions are respected and coverage limitations are visible to users.
 14. Scoring versions and analytical model versions are stored.
+15. Access to raw evidence, risk detail, and exports is restricted by role, enforced at the API layer.
+16. Claims/scores with insufficient supporting evidence are flagged rather than presented as definitive.
 
 ---
 
@@ -512,7 +534,7 @@ Build evaluation datasets covering:
 
 Metrics should include precision, recall, F1, calibration, clustering quality, duplicate-detection accuracy, grounding accuracy, latency, cost per analyzed item, and source coverage.
 
-Human review must be available for ambiguous or high-impact cases.
+Human review must be available for ambiguous or high-impact cases. Corrections made during human review shall be captured and fed back into evaluation datasets so recurring error patterns are measurable over time, not just corrected one-off.
 
 ---
 
@@ -537,6 +559,10 @@ The platform shall explicitly handle:
 - Insufficient evidence
 
 The analyst must distinguish observed discussion from verified fact. Allegations must not automatically become company facts.
+
+### Insufficient-evidence policy
+
+When available evidence for a claim, topic, or risk falls below a configured minimum (e.g., independent-source count, evidence confidence, or narrative-cluster size), the system shall not present a definitive score or conclusion. It shall instead return a low-confidence/insufficient-evidence status alongside whatever partial evidence exists, rather than silently extrapolating from too little data.
 
 ---
 

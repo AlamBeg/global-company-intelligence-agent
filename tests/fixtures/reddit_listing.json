@@ -1,0 +1,45 @@
+{
+  "kind": "Listing",
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "abc123",
+          "title": "Acme Corp just shipped a great update",
+          "selftext": "The new release fixed the bug that was bothering me for months.",
+          "author": "some_user",
+          "permalink": "/r/technology/comments/abc123/acme_corp_just_shipped_a_great_update/",
+          "created_utc": 1700000000,
+          "score": 42,
+          "num_comments": 7
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "def456",
+          "title": "Anyone else having issues with Acme Corp support?",
+          "selftext": "Been on hold for an hour, not impressed.",
+          "author": "another_user",
+          "permalink": "/r/technology/comments/def456/anyone_else_having_issues/",
+          "created_utc": 1700003600,
+          "score": 15,
+          "num_comments": 3
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "no-permalink-item",
+          "title": "Deleted post placeholder",
+          "selftext": "[removed]",
+          "author": "[deleted]",
+          "created_utc": 1700007200,
+          "score": 1,
+          "num_comments": 0
+        }
+      }
+    ]
+  }
+}

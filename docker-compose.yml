@@ -1,0 +1,26 @@
+version: "3.9"
+
+# Local development infra only. Kafka/Redpanda, OpenSearch, a vector store,
+# and a durable workflow engine (e.g. Temporal) get added when Lane 1/2 move
+# off the in-process runners in src/gcia/ingestion and src/gcia/workflows —
+# see docs/SYSTEM_ARCHITECTURE.md section 4 and MULTI_AGENT_ARCHITECTURE.md
+# "Execution model".
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: gcia
+      POSTGRES_PASSWORD: gcia
+      POSTGRES_DB: gcia
+    ports:
+      - "5432:5432"
+    volumes:
+      - gcia_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  gcia_postgres_data:

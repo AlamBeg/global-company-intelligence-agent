@@ -9,6 +9,7 @@
 - Implement queue/workflow foundation
 - Implement search index
 - Create model gateway and evaluation harness
+- Define API versioning scheme and role-based access control (viewer/analyst/admin)
 
 ## Phase 1 — MVP intelligence
 
@@ -40,8 +41,11 @@ Deliver:
 - Geographic intelligence
 - Risk engine
 - Emerging-topic detection
-- Alerts
 - Analyst agent
+- Competitive comparison (side-by-side scoring)
+- Executive briefing export (PDF/CSV)
+
+Alerts and notification delivery are deferred past Phase 2 for now.
 
 ## Phase 3 — Global scale
 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample News Feed</title>
+    <item>
+      <title>Acme Corp announces record quarterly earnings</title>
+      <link>https://example.com/news/acme-earnings-q3</link>
+      <guid>acme-earnings-q3</guid>
+      <description>Acme Corp reported record quarterly earnings today, beating analyst expectations and citing strong demand for its new product line.</description>
+    </item>
+    <item>
+      <title>Customers report frustration with Acme Corp support</title>
+      <link>https://example.com/news/acme-support-complaints</link>
+      <guid>acme-support-complaints</guid>
+      <description>Several customers have posted complaints about long wait times and unresolved issues with Acme Corp customer support this week.</description>
+    </item>
+    <item>
+      <title>Local weather update for the weekend</title>
+      <link>https://example.com/news/weather-weekend</link>
+      <guid>weather-weekend</guid>
+      <description>A cold front is expected to move through the region this weekend, bringing lower temperatures and light rain.</description>
+    </item>
+  </channel>
+</rss>
