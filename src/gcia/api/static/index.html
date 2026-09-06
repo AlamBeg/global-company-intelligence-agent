@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <title>GCIA Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
 <style>
   :root {
     --bg: #0a0e17;
@@ -165,6 +168,11 @@
   .tag.neutral { background: rgba(107,114,128,.2); color: #b7bccb; }
   .open-link { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; margin-top: 4px; display: inline-block; }
 
+  #worldMap { width: 100%; height: 320px; }
+  .jvm-tooltip { background: #1a2036 !important; border: 1px solid var(--panel-border) !important; color: var(--text) !important; font-family: inherit !important; }
+  .jvm-zoom-btn { background: var(--panel) !important; border: 1px solid var(--panel-border) !important; color: var(--text) !important; }
+  .map-legend { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+  .map-legend .scale-swatch { width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1a2036, var(--accent)); }
   .geo-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; }
   .geo-row .flag { font-size: 15px; }
   .geo-row .geo-bar-track { flex: 1; height: 6px; background: #1a2036; border-radius: 999px; overflow: hidden; }
@@ -322,9 +330,16 @@ const TEMPLATE = (data) => {
         <h3>Discussion Sources</h3>
         ${sourcesHtml(data.source_distribution)}
       </div>
-      <div id="geo-section" class="card">
-        <h3>Geographical</h3>
-        ${geoHtml(data.geography)}
+    </div>
+
+    <div id="geo-section" class="card" style="margin-bottom:16px;">
+      <h3>Geographical</h3>
+      <div class="grid" style="grid-template-columns: 1.6fr 1fr; margin-bottom:0;">
+        <div>
+          <div id="worldMap"></div>
+          <div class="map-legend"><span class="scale-swatch"></span><span>fewer discussions &rarr; more discussions (only countries with real matches are colored)</span></div>
+        </div>
+        <div>${geoHtml(data.geography)}</div>
       </div>
     </div>
 
@@ -610,6 +625,60 @@ async function load() {
   freshness.textContent = `Loaded ${new Date().toLocaleTimeString()}`;
   document.getElementById('askResult').textContent = `Ready — ask about ${currentData.canonical_name}.`;
   loadTrend(id);
+  renderWorldMap(currentData.geography);
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function interpolateHex(t, fromHex, toHex) {
+  const from = hexToRgb(fromHex);
+  const to = hexToRgb(toHex);
+  const channel = (i) => Math.round(from[i] + (to[i] - from[i]) * t).toString(16).padStart(2, '0');
+  return `#${channel(0)}${channel(1)}${channel(2)}`;
+}
+
+function renderWorldMap(geography) {
+  const container = document.getElementById('worldMap');
+  if (!container || typeof jsVectorMap === 'undefined') return;
+  const values = geography || {};
+  const counts = Object.values(values);
+  const min = counts.length ? Math.min(...counts) : 0;
+  const max = counts.length ? Math.max(...counts) : 1;
+
+  // jsvectormap 1.5.3's series.regions "scale" is an exact value -> color
+  // lookup table (scale[count]), not a min/max gradient - so the gradient
+  // has to be computed here and passed as one entry per distinct count.
+  const scale = {};
+  for (const count of counts) {
+    const t = max === min ? 1 : (count - min) / (max - min);
+    scale[count] = interpolateHex(t, '#28407a', '#3b82f6');
+  }
+
+  try {
+    new jsVectorMap({
+      selector: '#worldMap',
+      map: 'world',
+      zoomButtons: true,
+      regionStyle: {
+        initial: { fill: '#1a2036', stroke: '#232a41', strokeWidth: 0.5 },
+        hover: { fill: '#60a5fa', cursor: 'pointer' },
+      },
+      series: {
+        regions: [{ values, scale, attribute: 'fill' }],
+      },
+      onRegionTooltipShow(event, tooltip, code) {
+        const count = values[code];
+        tooltip.text(`${tooltip.text()}${count ? ': ' + count + ' discussion(s)' : ': no data'}`, false);
+      },
+    });
+  } catch (e) {
+    // Real per-country data still shows in the list beside the map even if
+    // the map widget itself fails to render (e.g. CDN blocked).
+    container.innerHTML = '<p class="muted">Map failed to load (network/CDN issue) — see the list for real per-country counts.</p>';
+  }
 }
 
 async function ask() {
