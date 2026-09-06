@@ -3,9 +3,25 @@ from __future__ import annotations
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Iterable
 
 from gcia.schemas.discussion import RawRecord
+
+
+def _parse_pub_date(raw: str | None) -> datetime | None:
+    """RSS pubDate is RFC 2822 (e.g. "Mon, 06 Sep 2026 10:00:00 GMT"). Returns
+    None on anything unparseable rather than guessing - a missing real
+    timestamp is more honest than a fabricated one."""
+    if not raw:
+        return None
+    try:
+        parsed = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 class RssNewsConnector:
@@ -41,5 +57,6 @@ class RssNewsConnector:
                 title=item.findtext("title"),
                 content=item.findtext("description") or "",
                 collected_at=collected_at,
+                published_at=_parse_pub_date(item.findtext("pubDate")),
                 raw_payload={child.tag: (child.text or "") for child in item},
             )

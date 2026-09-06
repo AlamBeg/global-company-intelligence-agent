@@ -29,7 +29,7 @@ from gcia.agents.lane1.sentiment import SentimentAgent
 from gcia.agents.lane3.verification import VerificationAgent
 from gcia.common.config import settings
 from gcia.common.context import Budget, RunContext
-from gcia.common.model_gateway import AnthropicProvider, ModelGateway, MockProvider
+from gcia.common.model_gateway import ModelGateway, resolve_provider
 from gcia.connectors.reddit_public import RedditPublicConnector
 from gcia.connectors.rss_news import RssNewsConnector
 from gcia.schemas.company import Company
@@ -67,15 +67,7 @@ def _build_connector(connector_name: str, source_url: str):
 
 def run(company_id: str, canonical_name: str, source_url: str, connector_name: str = "rss") -> int:
     init_db()
-
-    if settings.anthropic_api_key:
-        provider = AnthropicProvider()
-    else:
-        provider = MockProvider(fixed_response=_NO_KEY_FALLBACK_RESPONSE)
-        logger.warning(
-            "ANTHROPIC_API_KEY not set - relevance/sentiment/emotion/intent/claim will use a "
-            "placeholder response, not real model output. Set it in .env for real analysis."
-        )
+    provider = resolve_provider(_NO_KEY_FALLBACK_RESPONSE)
 
     context = RunContext(
         tenant_id="local",

@@ -83,6 +83,38 @@ class AnthropicProvider:
         return parsed, response.usage.input_tokens, response.usage.output_tokens
 
 
+class OpenAIProvider:
+    """Thin wrapper over the OpenAI Chat Completions API (JSON mode). Same
+    complete_json contract as AnthropicProvider - agents never know which
+    vendor is behind the gateway; only ModelGateway/config care.
+    """
+
+    def complete_json(
+        self, *, model: str, system: str, prompt: str, schema_hint: str
+    ) -> tuple[dict[str, Any], int, int]:
+        import openai
+
+        if not settings.openai_api_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY is not set; configure it in .env before using OpenAIProvider"
+            )
+        client = openai.OpenAI(api_key=settings.openai_api_key)
+        response = client.chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{system}\n\nRespond with JSON matching this shape:\n{schema_hint}",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        parsed = json.loads(response.choices[0].message.content)
+        usage = response.usage
+        return parsed, usage.prompt_tokens, usage.completion_tokens
+
+
 class MockProvider:
     """Deterministic stand-in for tests and local dev without API access."""
 
@@ -101,17 +133,31 @@ class MockProvider:
         )
 
 
+_MODEL_NAMES_BY_PROVIDER = {
+    "anthropic": {
+        ModelTier.SMALL: lambda: settings.gcia_model_small,
+        ModelTier.LARGE: lambda: settings.gcia_model_large,
+    },
+    "openai": {
+        ModelTier.SMALL: lambda: settings.gcia_openai_model_small,
+        ModelTier.LARGE: lambda: settings.gcia_openai_model_large,
+    },
+}
+
+
 class ModelGateway:
-    def __init__(self, provider: Provider | None = None):
-        self.provider = provider or AnthropicProvider()
+    def __init__(self, provider: Provider | None = None, provider_kind: str | None = None):
+        self.provider_kind = provider_kind or settings.gcia_model_provider
+        self.provider = provider or (
+            OpenAIProvider() if self.provider_kind == "openai" else AnthropicProvider()
+        )
         self._cache: dict[str, ModelCallResult] = {}
 
     def _model_for(self, tier: str) -> str:
-        if tier == ModelTier.SMALL:
-            return settings.gcia_model_small
-        if tier == ModelTier.LARGE:
-            return settings.gcia_model_large
-        raise ValueError(f"tier {tier!r} has no model (deterministic agents should not call complete())")
+        models = _MODEL_NAMES_BY_PROVIDER.get(self.provider_kind, _MODEL_NAMES_BY_PROVIDER["anthropic"])
+        if tier not in models:
+            raise ValueError(f"tier {tier!r} has no model (deterministic agents should not call complete())")
+        return models[tier]()
 
     def complete(
         self,
@@ -176,3 +222,29 @@ class ModelGateway:
 
 def prompt_cache_key(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def resolve_provider(fallback_response: dict[str, Any]) -> Provider:
+    """Single decision point every entrypoint (ingestion, Lane 2, ask,
+    discovery) uses to pick a provider, instead of each repeating its own
+    if/else: honors GCIA_MODEL_PROVIDER (anthropic|openai, default
+    anthropic), falls back to MockProvider with a logged warning when the
+    matching API key isn't configured - never silently uses a different
+    provider than the one requested.
+    """
+    if settings.gcia_model_provider == "openai":
+        if settings.openai_api_key:
+            return OpenAIProvider()
+        logger.warning(
+            "GCIA_MODEL_PROVIDER=openai but OPENAI_API_KEY is not set - using a "
+            "placeholder response, not real model output."
+        )
+    else:
+        if settings.anthropic_api_key:
+            return AnthropicProvider()
+        logger.warning(
+            "ANTHROPIC_API_KEY is not set - using a placeholder response, not real "
+            "model output. Set it in .env, or set GCIA_MODEL_PROVIDER=openai with "
+            "OPENAI_API_KEY, for real analysis."
+        )
+    return MockProvider(fixed_response=fallback_response)

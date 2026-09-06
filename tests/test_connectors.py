@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+from datetime import datetime, timezone
 
 from gcia.connectors.reddit_public import RedditPublicConnector
 from gcia.connectors.rss_news import RssNewsConnector
@@ -15,6 +16,23 @@ def test_rss_connector_never_yields_a_record_without_a_native_id():
     assert len(records) == 3
     assert all(r.source_native_id for r in records)
     assert all(r.original_url and r.original_url.startswith("https://") for r in records)
+
+
+def test_rss_connector_parses_real_pub_dates():
+    feed_uri = (_FIXTURES / "sample_feed.xml").resolve().as_uri()
+    records = {r.source_native_id: r for r in RssNewsConnector(feed_uri).collect()}
+
+    assert records["acme-earnings-q3"].published_at == datetime(2026, 9, 1, 9, 0, tzinfo=timezone.utc)
+    assert records["acme-support-complaints"].published_at == datetime(
+        2026, 9, 2, 14, 30, tzinfo=timezone.utc
+    )
+
+
+def test_rss_connector_leaves_published_at_none_when_pub_date_missing():
+    feed_uri = (_FIXTURES / "sample_feed.xml").resolve().as_uri()
+    records = {r.source_native_id: r for r in RssNewsConnector(feed_uri).collect()}
+
+    assert records["weather-weekend"].published_at is None
 
 
 def test_reddit_connector_skips_items_with_no_native_id():

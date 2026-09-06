@@ -5,12 +5,14 @@
 <title>GCIA Dashboard</title>
 <style>
   :root {
-    --bg: #0b0f19;
+    --bg: #0a0e17;
+    --sidebar: #0d1220;
     --panel: #121729;
     --panel-border: #232a41;
     --text: #e8ebf5;
     --muted: #8b93ab;
     --accent: #3b82f6;
+    --accent-dim: #1d4ed8;
     --green: #22c55e;
     --gray: #6b7280;
     --red: #ef4444;
@@ -21,46 +23,92 @@
     background: var(--bg);
     color: var(--text);
     margin: 0;
-    padding: 0 0 48px;
     overflow-x: hidden;
   }
-  header {
-    padding: 16px 28px;
-    border-bottom: 1px solid var(--panel-border);
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
+  .app { display: flex; min-height: 100vh; align-items: stretch; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 230px; flex-shrink: 0; background: var(--sidebar);
+    border-right: 1px solid var(--panel-border); padding: 20px 14px;
+    display: flex; flex-direction: column; gap: 18px;
   }
-  header h1 { font-size: 18px; margin: 0; }
-  header .tagline { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .globe { font-size: 26px; }
-  .search-bar { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+  .sidebar-brand .globe { font-size: 24px; }
+  .sidebar-brand h1 { font-size: 15px; margin: 0; }
+  .sidebar-brand .tagline { color: var(--muted); font-size: 10.5px; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 9px 10px; border-radius: 8px; color: var(--muted); font-size: 13px;
+    text-decoration: none; cursor: pointer;
+  }
+  .nav-item .icon { width: 18px; text-align: center; }
+  .nav-item.active { background: rgba(59,130,246,.15); color: var(--text); font-weight: 600; }
+  .nav-item.disabled { opacity: 0.45; cursor: default; }
+  .nav-item .soon { font-size: 9px; border: 1px solid var(--panel-border); border-radius: 999px; padding: 1px 6px; }
+  .sidebar-analyst {
+    margin-top: auto; background: linear-gradient(160deg, rgba(59,130,246,.18), rgba(18,23,41,.4));
+    border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px;
+  }
+  .sidebar-analyst h4 { margin: 0 0 4px; font-size: 13px; }
+  .sidebar-analyst p { margin: 0 0 10px; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+  .sidebar-analyst input {
+    width: 100%; margin-bottom: 6px; background: #1a2036; border: 1px solid var(--panel-border);
+    color: var(--text); padding: 8px 10px; border-radius: 7px; font-size: 12.5px;
+  }
+  .sidebar-analyst button { width: 100%; }
+  .sidebar-footer { font-size: 10.5px; color: var(--muted); text-align: center; }
+
+  /* ---------- Main area ---------- */
+  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    padding: 14px 24px; border-bottom: 1px solid var(--panel-border);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
   input[type="text"], input[type="password"] {
     background: #1a2036; border: 1px solid var(--panel-border); color: var(--text);
     padding: 9px 12px; border-radius: 8px; font-size: 14px;
   }
-  input#companyId { width: 200px; }
-  input#apiKey { width: 160px; }
+  #companyId { width: 220px; }
+  #apiKey { width: 170px; }
   button {
     background: var(--accent); color: white; border: none; padding: 9px 18px;
     border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600;
   }
   button:hover { opacity: 0.9; }
   button:disabled { opacity: 0.5; cursor: default; }
-  main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  button.secondary { background: transparent; border: 1px solid var(--panel-border); color: var(--text); }
+  #freshness { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .hero {
+    margin: 20px 24px 0; padding: 22px 26px; border-radius: 14px;
+    background: radial-gradient(circle at 85% 20%, rgba(59,130,246,.35), transparent 55%),
+                linear-gradient(135deg, #0f1b3d, #0a0e17 70%);
+    border: 1px solid var(--panel-border);
+  }
+  .hero-label { font-size: 11px; letter-spacing: .08em; color: #7fa8ff; font-weight: 700; }
+  .hero h2 { margin: 6px 0 4px; font-size: 22px; max-width: 640px; }
+  .hero p { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; max-width: 640px; }
+  .quick-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .quick-facts div { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
+  .quick-facts .qf-icon { font-size: 16px; }
+  .quick-facts .qf-sub { display: block; color: var(--muted); font-size: 11px; }
+
+  main { max-width: 1200px; margin: 20px auto 60px; padding: 0 24px; width: 100%; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px; }
   .card {
     background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 12px; padding: 18px;
-    min-width: 0; overflow-wrap: anywhere;
+    border-radius: 12px; padding: 18px; min-width: 0; overflow-wrap: anywhere;
   }
-  .scroll-list { max-height: 220px; overflow-y: auto; }
+  .scroll-list { max-height: 240px; overflow-y: auto; }
   .list-more { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
-  .card h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-  .big-number { font-size: 32px; font-weight: 700; margin: 6px 0; }
-  .sub { color: var(--muted); font-size: 13px; }
+  .card h3 { margin: 0 0 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .big-number { font-size: 30px; font-weight: 700; margin: 6px 0; }
+  .delta { font-size: 12px; font-weight: 600; }
+  .delta.up { color: var(--green); }
+  .delta.down { color: var(--red); }
+  .sub { color: var(--muted); font-size: 12.5px; }
   .placeholder {
     color: var(--muted); font-size: 13px; font-style: italic;
     padding: 24px 0; text-align: center; border: 1px dashed var(--panel-border); border-radius: 8px;
@@ -69,8 +117,37 @@
   .donut { width: 84px; height: 84px; border-radius: 50%; flex-shrink: 0; }
   .legend { font-size: 13px; }
   .legend div { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .section-title { font-size: 15px; font-weight: 700; margin: 28px 0 12px; }
+
+  /* company header */
+  .company-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .company-avatar {
+    width: 52px; height: 52px; border-radius: 12px; background: var(--accent-dim);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0;
+  }
+  .company-header h2 { margin: 0; font-size: 20px; }
+  .company-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: 8px; }
+  .company-tabs a {
+    color: var(--muted); text-decoration: none; font-size: 12.5px; padding: 6px 10px;
+    border-radius: 7px; border: 1px solid transparent;
+  }
+  .company-tabs a:hover { border-color: var(--panel-border); color: var(--text); }
+  .company-header .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* topic bars */
+  .bar-row { margin: 9px 0; font-size: 13px; }
+  .bar-row .bar-label { display: flex; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
+  .bar-track { height: 6px; background: #1a2036; border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+
+  /* discussions feed */
+  .platform-tabs { display: flex; gap: 6px; margin: 10px 0 14px; }
+  .ptab {
+    background: transparent; border: 1px solid var(--panel-border); color: var(--muted);
+    padding: 6px 14px; font-size: 12.5px; font-weight: 600;
+  }
+  .ptab.active { background: var(--accent); color: white; border-color: var(--accent); }
   .discussion {
     background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px;
     padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
@@ -78,90 +155,159 @@
   .discussion .content { flex: 1; }
   .discussion .excerpt { font-size: 14px; margin: 4px 0 0; color: var(--text); }
   .discussion .claim { font-size: 12px; color: var(--muted); }
-  .tag {
-    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  .platform-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--panel-border); border-radius: 5px; padding: 1px 6px; margin-right: 6px;
   }
+  .tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
   .tag.positive { background: rgba(34,197,94,.15); color: var(--green); }
   .tag.negative { background: rgba(239,68,68,.15); color: var(--red); }
   .tag.neutral { background: rgba(107,114,128,.2); color: #b7bccb; }
-  .open-link {
-    font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; margin-top: 4px; display: inline-block;
-  }
+  .open-link { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; margin-top: 4px; display: inline-block; }
+
+  .geo-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; }
+  .geo-row .flag { font-size: 15px; }
+  .geo-row .geo-bar-track { flex: 1; height: 6px; background: #1a2036; border-radius: 999px; overflow: hidden; }
+  .geo-row .geo-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+  .geo-row .geo-count { width: 32px; text-align: right; color: var(--muted); }
+
+  .compare-panel { border: 1px solid var(--accent-dim); }
+  .compare-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .compare-row input { flex: 1; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare-table th, .compare-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); }
+  .compare-table th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; }
+
   .muted { color: var(--muted); }
   .error { color: var(--red); padding: 16px 0; }
   .hidden { display: none; }
-  #result { margin-top: 8px; }
-  .ask-card { display: flex; gap: 8px; margin-bottom: 8px; }
-  .ask-card input { flex: 1; }
-  .ask-answer { font-size: 14px; margin-top: 10px; white-space: pre-wrap; }
-  .geo-row { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; }
+  .ask-answer { font-size: 12.5px; margin-top: 8px; white-space: pre-wrap; color: var(--text); max-height: 220px; overflow-y: auto; }
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <span class="globe">🌐</span>
-    <div>
-      <h1>Global Company Intelligence Agent</h1>
-      <div class="tagline">Evidence-backed company intelligence, from public discussion worldwide.</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="globe">🌐</span>
+      <div>
+        <h1>GCIA</h1>
+        <div class="tagline">Global Company Intelligence Agent</div>
+      </div>
     </div>
-  </div>
-  <div class="search-bar">
-    <input type="password" id="apiKey" placeholder="X-API-Key (optional)" onchange="saveApiKey()">
-    <input type="text" id="companyId" placeholder="company_id, e.g. acme" onkeydown="if(event.key==='Enter')load()">
-    <button onclick="load()">Analyze</button>
-  </div>
-</header>
+    <nav class="nav">
+      <a class="nav-item active" href="#top"><span><span class="icon">📊</span> Overview</span></a>
+      <a class="nav-item disabled"><span><span class="icon">🏢</span> Companies</span><span class="soon">not built</span></a>
+      <a class="nav-item disabled"><span><span class="icon">📡</span> Real-time Feed</span><span class="soon">not built</span></a>
+      <a class="nav-item disabled"><span><span class="icon">📈</span> Topics &amp; Trends</span><span class="soon">not built</span></a>
+      <a class="nav-item disabled"><span><span class="icon">🗺️</span> Global Map</span><span class="soon">not built</span></a>
+      <a class="nav-item disabled"><span><span class="icon">⚠️</span> Alerts</span><span class="soon">deferred</span></a>
+      <a class="nav-item disabled"><span><span class="icon">📄</span> Reports</span><span class="soon">not built</span></a>
+    </nav>
+    <div class="sidebar-analyst">
+      <h4>🤖 AI Analyst</h4>
+      <p>Ask a question about the loaded company. Answers are grounded only in ingested evidence.</p>
+      <input type="text" id="askInput" placeholder="e.g. What are the main complaints?" onkeydown="if(event.key==='Enter')ask()">
+      <button onclick="ask()">Ask</button>
+      <div id="askResult" class="ask-answer muted">Load a company first.</div>
+    </div>
+    <div class="sidebar-footer">GCIA · local MVP · no fabricated data</div>
+  </aside>
 
-<main>
-  <div id="empty" class="placeholder" style="margin-top:40px;">
-    Enter a company_id you've ingested via
-    <code>python -m gcia.ingestion.run_ingestion</code>, then click Analyze.
-    If the API has <code>GCIA_API_KEYS</code> configured, enter a key above first.
+  <div class="main-area">
+    <div class="topbar">
+      <input type="text" id="companyId" placeholder="company_id, e.g. acme" onkeydown="if(event.key==='Enter')load()">
+      <button onclick="load()">Analyze</button>
+      <input type="password" id="apiKey" placeholder="X-API-Key (optional)" onchange="saveApiKey()">
+      <span id="freshness"></span>
+    </div>
+
+    <div class="hero">
+      <div class="hero-label">GLOBAL COMPANY INTELLIGENCE</div>
+      <h2>See what's actually being said about a company — with the receipts</h2>
+      <p>Every score below traces back to a real, clickable source. Nothing here is invented — sections without real data say so instead of faking a number.</p>
+      <div class="quick-facts">
+        <div><span class="qf-icon">🔌</span><span>2 connectors<span class="qf-sub">RSS &amp; Reddit today</span></span></div>
+        <div><span class="qf-icon">🧠</span><span>Cost-tiered AI<span class="qf-sub">Claude or OpenAI, your key</span></span></div>
+        <div><span class="qf-icon">🔗</span><span>Original links<span class="qf-sub">every claim cites a URL</span></span></div>
+        <div><span class="qf-icon">🛡️</span><span>Honest placeholders<span class="qf-sub">never fakes analysis without a key</span></span></div>
+      </div>
+    </div>
+
+    <main id="top">
+      <div id="empty" class="placeholder" style="margin-top:24px;">
+        Enter a company_id you've ingested via <code>python -m gcia.ingestion.run_ingestion</code>, then click Analyze.
+      </div>
+      <div id="result" class="hidden"></div>
+    </main>
   </div>
-  <div id="result" class="hidden"></div>
-</main>
+</div>
 
 <script>
 let currentCompanyId = null;
+let currentData = null;
+let evidenceFilter = 'all';
 
 const TEMPLATE = (data) => {
   const s = data.sentiment;
   const total = s.positive + s.neutral + s.negative;
   const pct = (n) => total ? Math.round((n / total) * 100) : 0;
   const scoreOn100 = s.overall_score !== null ? Math.round((s.overall_score + 1) * 50) : null;
+  const initial = (data.canonical_name || '?').trim().charAt(0).toUpperCase();
 
   return `
-    <div class="grid">
-      <div class="card">
-        <h3>Company</h3>
-        <div class="big-number" style="font-size:22px">${escapeHtml(data.canonical_name)}</div>
+    <div class="company-header card">
+      <div class="company-avatar">${escapeHtml(initial)}</div>
+      <div>
+        <h2>${escapeHtml(data.canonical_name)}</h2>
         <div class="sub">${escapeHtml(data.company_id)}</div>
       </div>
+      <div class="company-tabs">
+        <a href="#stats">Overview</a>
+        <a href="#sentiment-section">Sentiment</a>
+        <a href="#topics-section">Topics</a>
+        <a href="#sources-section">Sources</a>
+        <a href="#geo-section">Geographical</a>
+        <a href="#risk-section">Risk</a>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="toggleCompare()">Compare</button>
+      </div>
+    </div>
+
+    <div id="compareBox" class="card compare-panel hidden" style="margin-bottom:16px;">
+      <h3>Compare against another ingested company</h3>
+      <div class="compare-row">
+        <input type="text" id="compareWithId" placeholder="other company_id, e.g. globex">
+        <button onclick="runCompare()">Compare</button>
+      </div>
+      <div id="compareResult"></div>
+    </div>
+
+    <div id="stats" class="grid">
       <div class="card">
-        <h3>Overall Sentiment</h3>
+        <h3>Sentiment Score</h3>
         <div class="big-number">${scoreOn100 !== null ? scoreOn100 + ' / 100' : 'n/a'}</div>
-        <div class="sub">from ${s.sample_size} scored discussion(s)</div>
+        <div class="sub" id="sentimentTrend">from ${s.sample_size} scored discussion(s)</div>
       </div>
       <div class="card">
         <h3>Total Discussions</h3>
         <div class="big-number">${data.discussion_count}</div>
-        <div class="sub">${data.claim_count} claim(s) extracted</div>
+        <div class="sub" id="volumeTrend">${data.claim_count} claim(s) extracted</div>
       </div>
       <div class="card">
         <h3>Credibility</h3>
-        <div class="big-number">${data.credibility_score !== null && data.credibility_score !== undefined ? data.credibility_score.toFixed(2) : 'n/a'}</div>
+        <div class="big-number">${fmt(data.credibility_score)}</div>
         <div class="sub">not a truth score — signal quality only</div>
       </div>
       <div class="card">
         <h3>Avg. Impact</h3>
-        <div class="big-number">${data.avg_impact_score !== null && data.avg_impact_score !== undefined ? data.avg_impact_score.toFixed(2) : 'n/a'}</div>
-        <div class="sub">engagement/propagation-weighted, independent of sentiment</div>
+        <div class="big-number">${fmt(data.avg_impact_score)}</div>
+        <div class="sub">engagement/propagation-weighted</div>
       </div>
     </div>
 
     <div class="grid">
-      <div class="card">
+      <div id="sentiment-section" class="card">
         <h3>Sentiment Breakdown</h3>
         <div class="donut-row">
           ${donut(pct(s.positive), pct(s.negative))}
@@ -172,7 +318,18 @@ const TEMPLATE = (data) => {
           </div>
         </div>
       </div>
-      <div class="card">
+      <div id="sources-section" class="card">
+        <h3>Discussion Sources</h3>
+        ${sourcesHtml(data.source_distribution)}
+      </div>
+      <div id="geo-section" class="card">
+        <h3>Geographical</h3>
+        ${geoHtml(data.geography)}
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1.4fr 1fr;">
+      <div id="topics-section" class="card">
         <h3>Top Topics</h3>
         ${topicsHtml(data.topics)}
       </div>
@@ -180,38 +337,49 @@ const TEMPLATE = (data) => {
         <h3>Narrative &amp; Dedup</h3>
         ${dedupHtml(data.narrative_dedup, data.narratives)}
       </div>
-      <div class="card">
-        <h3>Geographic Breakdown</h3>
-        ${geoHtml(data.geography)}
-      </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
+    <div id="risk-section" class="card" style="margin-bottom:16px;">
       <h3>Risk Summary</h3>
       ${risksHtml(data.risks)}
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <h3>AI Analyst — ask a question about ${escapeHtml(data.canonical_name)}</h3>
-      <div class="ask-card">
-        <input type="text" id="askInput" placeholder="e.g. What are customers complaining about?" onkeydown="if(event.key==='Enter')ask()">
-        <button onclick="ask()">Ask</button>
-      </div>
-      <div id="askResult" class="ask-answer muted">Requires 'analyst' role or above if GCIA_API_KEYS is configured.</div>
-    </div>
-
-    <div class="section-title">Evidence (${data.evidence.length})</div>
-    ${evidenceListHtml(data.evidence)}
+    <div class="section-title">Recent Discussions (${data.evidence.length})</div>
+    <div class="platform-tabs" id="platformTabs">${platformTabsHtml(data.source_distribution)}</div>
+    <div id="evidenceContainer">${evidenceListHtml(data.evidence, 'all')}</div>
   `;
 };
 
+function fmt(n) {
+  return (n === null || n === undefined) ? 'n/a' : n.toFixed(2);
+}
+
 const MAX_EVIDENCE_SHOWN = 30;
 
-function evidenceListHtml(evidence) {
-  if (!evidence.length) return '<div class="placeholder">No evidence yet — run ingestion for this company.</div>';
-  const shown = evidence.slice(0, MAX_EVIDENCE_SHOWN).map(evidenceRow).join('');
-  const more = evidence.length > MAX_EVIDENCE_SHOWN
-    ? `<p class="muted">+${evidence.length - MAX_EVIDENCE_SHOWN} more not shown here — use the API (/v1/companies/{id}) or briefing export for the full list.</p>`
+function platformTabsHtml(sourceDist) {
+  const platforms = Object.keys(sourceDist || {});
+  const tabs = ['all', ...platforms];
+  return tabs.map(p => `
+    <button class="ptab ${p === 'all' ? 'active' : ''}" onclick="filterEvidence('${p}', this)">
+      ${p === 'all' ? 'All' : escapeHtml(p)}
+    </button>`).join('');
+}
+
+function filterEvidence(platform, btn) {
+  evidenceFilter = platform;
+  document.querySelectorAll('#platformTabs .ptab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('evidenceContainer').innerHTML = evidenceListHtml(currentData.evidence, platform);
+}
+
+function evidenceListHtml(evidence, platformFilter) {
+  const filtered = platformFilter && platformFilter !== 'all'
+    ? evidence.filter(e => e.platform === platformFilter)
+    : evidence;
+  if (!filtered.length) return '<div class="placeholder">No evidence for this filter yet.</div>';
+  const shown = filtered.slice(0, MAX_EVIDENCE_SHOWN).map(evidenceRow).join('');
+  const more = filtered.length > MAX_EVIDENCE_SHOWN
+    ? `<p class="muted">+${filtered.length - MAX_EVIDENCE_SHOWN} more not shown here — use the API (/v1/companies/{id}) or briefing export for the full list.</p>`
     : '';
   return shown + more;
 }
@@ -222,10 +390,11 @@ const MAX_LIST_ITEMS = 8;
 function topicsHtml(topics) {
   if (!topics || !topics.length) return `<div class="placeholder">${LANE2_HINT}</div>`;
   const sorted = [...topics].sort((a, b) => b.volume - a.volume);
+  const max = sorted[0].volume || 1;
   const shown = sorted.slice(0, MAX_LIST_ITEMS).map(t => `
-    <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:8px 0;">
-      <span>${escapeHtml(t.label)}</span>
-      <span class="muted" style="white-space:nowrap;">${t.volume} &middot; conf ${t.confidence.toFixed(2)}</span>
+    <div class="bar-row">
+      <div class="bar-label"><span>${escapeHtml(t.label)}</span><span class="muted" style="white-space:nowrap;">${t.volume} &middot; conf ${t.confidence.toFixed(2)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round((t.volume / max) * 100)}%"></div></div>
     </div>`).join('');
   const more = sorted.length > MAX_LIST_ITEMS
     ? `<div class="list-more">+${sorted.length - MAX_LIST_ITEMS} more (mostly singleton clusters — naive word-overlap clustering, see docs/MVP_ROADMAP.md)</div>`
@@ -239,22 +408,53 @@ function dedupHtml(dedup, narratives) {
   const shown = list.slice(0, MAX_LIST_ITEMS).map(n => `
     <div style="font-size:12px;margin:4px 0;" class="muted">${escapeHtml(n.label)} (${n.size} discussion(s))</div>
   `).join('');
-  const more = list.length > MAX_LIST_ITEMS
-    ? `<div class="list-more">+${list.length - MAX_LIST_ITEMS} more</div>`
-    : '';
+  const more = list.length > MAX_LIST_ITEMS ? `<div class="list-more">+${list.length - MAX_LIST_ITEMS} more</div>` : '';
   return `
     <div class="big-number" style="font-size:22px">${dedup.duplicate_clusters}</div>
     <div class="sub">duplicate cluster(s) &middot; ${dedup.duplicate_discussions_grouped} discussion(s) grouped, not double-counted</div>
     <div class="scroll-list">${shown}</div>${more}`;
 }
 
+function flagEmoji(countryCode) {
+  if (!countryCode || countryCode.length !== 2) return '🏳️';
+  const codePoints = [...countryCode.toUpperCase()].map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 function geoHtml(geography) {
   const entries = Object.entries(geography || {});
   if (!entries.length) return `<div class="placeholder">No geography inferred yet (low-confidence keyword matches only).</div>`;
   entries.sort((a, b) => b[1] - a[1]);
+  const max = entries[0][1] || 1;
   return entries.map(([country, count]) => `
-    <div class="geo-row"><span>${escapeHtml(country)}</span><span class="muted">${count}</span></div>
+    <div class="geo-row">
+      <span class="flag">${flagEmoji(country)}</span>
+      <span style="width:34px;">${escapeHtml(country)}</span>
+      <div class="geo-bar-track"><div class="geo-bar-fill" style="width:${Math.round((count / max) * 100)}%"></div></div>
+      <span class="geo-count">${count}</span>
+    </div>`).join('');
+}
+
+function sourcesHtml(sourceDist) {
+  const entries = Object.entries(sourceDist || {});
+  if (!entries.length) return '<div class="placeholder">No source data yet.</div>';
+  const total = entries.reduce((sum, [, n]) => sum + n, 0);
+  const colors = ['var(--accent)', 'var(--green)', '#f59e0b', '#a855f7', '#ec4899'];
+  let acc = 0;
+  const stops = entries.map(([, n], i) => {
+    const pctStart = (acc / total) * 100;
+    acc += n;
+    const pctEnd = (acc / total) * 100;
+    return `${colors[i % colors.length]} ${pctStart}% ${pctEnd}%`;
+  }).join(', ');
+  const legend = entries.map(([platform, n], i) => `
+    <div><span class="dot" style="background:${colors[i % colors.length]}"></span>${escapeHtml(platform)} · ${n} (${Math.round((n / total) * 100)}%)</div>
   `).join('');
+  return `
+    <div class="donut-row">
+      <div class="donut" style="background:conic-gradient(${stops})"></div>
+      <div class="legend">${legend}</div>
+    </div>`;
 }
 
 function risksHtml(risks) {
@@ -268,7 +468,7 @@ function risksHtml(risks) {
 
 function donut(positivePct, negativePct) {
   const p1 = positivePct;
-  const p2 = positivePct + (100 - positivePct - negativePct); // neutral boundary
+  const p2 = positivePct + (100 - positivePct - negativePct);
   const gradient = `conic-gradient(var(--green) 0% ${p1}%, var(--gray) ${p1}% ${p2}%, var(--red) ${p2}% 100%)`;
   return `<div class="donut" style="background:${gradient}"></div>`;
 }
@@ -287,6 +487,7 @@ function evidenceRow(e) {
   return `
     <div class="discussion">
       <div class="content">
+        <span class="platform-badge">${escapeHtml(e.platform || '?')}</span>
         <span class="tag ${tagClass}">${escapeHtml(e.claim_supported || 'unlabeled')}</span>
         <div class="excerpt">${escapeHtml(e.excerpt)}</div>
         <div class="claim">confidence ${e.confidence.toFixed(2)}${extra ? ' · ' + escapeHtml(extra) : ''}</div>
@@ -313,10 +514,78 @@ function restoreApiKey() {
   } catch (e) {}
 }
 
+function toggleCompare() {
+  document.getElementById('compareBox').classList.toggle('hidden');
+}
+
+async function runCompare() {
+  const otherId = document.getElementById('compareWithId').value.trim();
+  const out = document.getElementById('compareResult');
+  if (!otherId || !currentCompanyId) return;
+  out.innerHTML = '<p class="muted">Comparing…</p>';
+
+  let res;
+  try {
+    res = await fetch(`/v1/compare?company_ids=${encodeURIComponent(currentCompanyId)},${encodeURIComponent(otherId)}`, {
+      headers: apiHeaders(),
+    });
+  } catch (e) {
+    out.innerHTML = '<p class="error">Could not reach the API.</p>';
+    return;
+  }
+  if (!res.ok) {
+    out.innerHTML = `<p class="error">Error ${res.status} — check the company_id and your API key/role.</p>`;
+    return;
+  }
+  const data = await res.json();
+  if (data.missing_company_ids.length) {
+    out.innerHTML = `<p class="error">Not ingested yet: ${data.missing_company_ids.join(', ')}</p>`;
+    return;
+  }
+  const companies = Object.values(data.companies);
+  out.innerHTML = `
+    <table class="compare-table">
+      <tr><th>Company</th><th>Sentiment</th><th>Discussions</th><th>Credibility</th><th>Avg Impact</th></tr>
+      ${companies.map(c => `
+        <tr>
+          <td>${escapeHtml(c.canonical_name)} ${data.ranked_by_sentiment[0] === c.company_id ? '🏆' : ''}</td>
+          <td>${c.sentiment.overall_score !== null ? c.sentiment.overall_score.toFixed(2) : 'n/a'}</td>
+          <td>${c.discussion_count}</td>
+          <td>${fmt(c.credibility_score)}</td>
+          <td>${fmt(c.avg_impact_score)}</td>
+        </tr>`).join('')}
+    </table>`;
+}
+
+async function loadTrend(id) {
+  try {
+    const res = await fetch(`/v1/companies/${encodeURIComponent(id)}/trend?window_days=7`, { headers: apiHeaders() });
+    if (!res.ok) return;
+    const trend = await res.json();
+    const volumeEl = document.getElementById('volumeTrend');
+    const sentimentEl = document.getElementById('sentimentTrend');
+    if (trend.baseline.volume === 0) {
+      if (volumeEl) volumeEl.innerHTML += ' <span class="muted">(no prior 7-day window yet)</span>';
+      return;
+    }
+    if (volumeEl) {
+      const up = trend.volume_change_pct >= 0;
+      volumeEl.innerHTML += ` <span class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(trend.volume_change_pct).toFixed(0)}% vs prior 7d</span>`;
+    }
+    if (sentimentEl) {
+      const up = trend.sentiment_shift >= 0;
+      sentimentEl.innerHTML += ` <span class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(trend.sentiment_shift).toFixed(0)}pt shift</span>`;
+    }
+  } catch (e) {
+    // Trend is a nice-to-have overlay; a failure here shouldn't break the page.
+  }
+}
+
 async function load() {
   const id = document.getElementById('companyId').value.trim();
   const result = document.getElementById('result');
   const empty = document.getElementById('empty');
+  const freshness = document.getElementById('freshness');
   if (!id) return;
   currentCompanyId = id;
 
@@ -335,15 +604,19 @@ async function load() {
     result.innerHTML = `<p class="error">Error ${res.status}: not found, not ingested yet, or missing/invalid API key.</p>`;
     return;
   }
-  const data = await res.json();
-  result.innerHTML = TEMPLATE(data);
+  currentData = await res.json();
+  evidenceFilter = 'all';
+  result.innerHTML = TEMPLATE(currentData);
+  freshness.textContent = `Loaded ${new Date().toLocaleTimeString()}`;
+  document.getElementById('askResult').textContent = `Ready — ask about ${currentData.canonical_name}.`;
+  loadTrend(id);
 }
 
 async function ask() {
   const input = document.getElementById('askInput');
   const out = document.getElementById('askResult');
   const question = input.value.trim();
-  if (!question || !currentCompanyId) return;
+  if (!question || !currentCompanyId) { out.textContent = 'Load a company first.'; return; }
 
   out.textContent = 'Thinking…';
   let res;

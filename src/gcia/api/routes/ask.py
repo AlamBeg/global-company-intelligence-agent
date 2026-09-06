@@ -7,7 +7,7 @@ from gcia.agents.lane3.synthesis import SynthesisAgent
 from gcia.common.auth import require_role
 from gcia.common.config import settings
 from gcia.common.context import Budget, RunContext
-from gcia.common.model_gateway import AnthropicProvider, ModelGateway, MockProvider
+from gcia.common.model_gateway import ModelGateway, resolve_provider
 from gcia.schemas.evidence import Evidence
 from gcia.storage.db import SessionLocal, init_db
 from gcia.storage.models import EvidenceRecord
@@ -15,7 +15,7 @@ from gcia.storage.models import EvidenceRecord
 router = APIRouter(prefix="/v1/companies", tags=["ask"])
 
 _NO_KEY_RESPONSE = {
-    "answer": "ANTHROPIC_API_KEY is not configured - this is a placeholder, not a real answer.",
+    "answer": "No model provider is configured - this is a placeholder, not a real answer.",
     "citations": [],
     "confidence": 0.0,
 }
@@ -68,9 +68,7 @@ def ask_company_question(
         for r in records
     ]
 
-    provider = AnthropicProvider() if settings.anthropic_api_key else MockProvider(
-        fixed_response=_NO_KEY_RESPONSE
-    )
+    provider = resolve_provider(_NO_KEY_RESPONSE)
     context = RunContext(
         tenant_id="api",
         budget=Budget(

@@ -306,9 +306,11 @@ def get_company_summary(session: Session, company_id: str) -> dict | None:
     avg_score = sum(s.overall_score for s in sentiments) / len(sentiments) if sentiments else None
 
     geography: dict[str, int] = {}
+    source_distribution: dict[str, int] = {}
     for d in discussions:
         if d.country:
             geography[d.country] = geography.get(d.country, 0) + 1
+        source_distribution[d.platform] = source_distribution.get(d.platform, 0) + 1
 
     return {
         "company_id": company.company_id,
@@ -324,6 +326,7 @@ def get_company_summary(session: Session, company_id: str) -> dict | None:
             "sample_size": len(sentiments),
         },
         "geography": geography,
+        "source_distribution": source_distribution,
         "claim_count": len(claims),
         "evidence": [
             {
@@ -332,6 +335,7 @@ def get_company_summary(session: Session, company_id: str) -> dict | None:
                 "excerpt": e.excerpt,
                 "claim_supported": e.claim_supported,
                 "confidence": e.evidence_confidence,
+                "platform": e.platform,
                 "analytical_labels": e.analytical_labels or {},
             }
             for e in evidence

@@ -6,12 +6,14 @@
       <title>Acme Corp announces record quarterly earnings</title>
       <link>https://example.com/news/acme-earnings-q3</link>
       <guid>acme-earnings-q3</guid>
+      <pubDate>Mon, 01 Sep 2026 09:00:00 GMT</pubDate>
       <description>Acme Corp reported record quarterly earnings today, beating analyst expectations and citing strong demand for its new product line.</description>
     </item>
     <item>
       <title>Customers report frustration with Acme Corp support</title>
       <link>https://example.com/news/acme-support-complaints</link>
       <guid>acme-support-complaints</guid>
+      <pubDate>Tue, 02 Sep 2026 14:30:00 GMT</pubDate>
       <description>Several customers have posted complaints about long wait times and unresolved issues with Acme Corp customer support this week.</description>
     </item>
     <item>

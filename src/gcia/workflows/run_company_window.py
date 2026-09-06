@@ -28,7 +28,7 @@ from gcia.agents.lane2.risk import RiskAgent
 from gcia.agents.lane2.topic import TopicAgent
 from gcia.common.config import settings
 from gcia.common.context import Budget, RunContext
-from gcia.common.model_gateway import AnthropicProvider, ModelGateway, MockProvider
+from gcia.common.model_gateway import ModelGateway, resolve_provider
 from gcia.storage import repository
 from gcia.storage.db import SessionLocal, init_db
 
@@ -59,15 +59,7 @@ _ENGAGEMENT_SATURATION_POINT = 100.0
 
 def run(company_id: str) -> dict:
     init_db()
-
-    if settings.anthropic_api_key:
-        provider = AnthropicProvider()
-    else:
-        provider = MockProvider(fixed_response=_NO_KEY_FALLBACK_RESPONSE)
-        logger.warning(
-            "ANTHROPIC_API_KEY not set - topic/narrative labels and risk summaries will be "
-            "placeholders, not real model output. Set it in .env for real analysis."
-        )
+    provider = resolve_provider(_NO_KEY_FALLBACK_RESPONSE)
 
     context = RunContext(
         tenant_id="local",

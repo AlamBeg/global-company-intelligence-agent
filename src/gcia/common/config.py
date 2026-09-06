@@ -7,9 +7,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # Which vendor ModelGateway routes to: "anthropic" (default) or "openai".
+    # Swappable because agents only ever call context.model_gateway.complete()
+    # - never a vendor SDK directly.
+    gcia_model_provider: str = "anthropic"
+
     anthropic_api_key: str | None = None
     gcia_model_small: str = "claude-haiku-4-5-20251001"
     gcia_model_large: str = "claude-sonnet-5"
+
+    openai_api_key: str | None = None
+    gcia_openai_model_small: str = "gpt-4o-mini"
+    gcia_openai_model_large: str = "gpt-4o"
 
     gcia_max_tokens_per_run: int = 200_000
     gcia_max_cost_usd_per_run: float = 5.00

@@ -7,7 +7,7 @@ from gcia.agents.lane3.discovery import DiscoveryAgent
 from gcia.common.auth import require_role
 from gcia.common.config import settings
 from gcia.common.context import Budget, RunContext
-from gcia.common.model_gateway import AnthropicProvider, ModelGateway, MockProvider
+from gcia.common.model_gateway import ModelGateway, resolve_provider
 from gcia.schemas.company import Company, EntityAlias
 
 router = APIRouter(prefix="/v1/companies", tags=["discovery"])
@@ -31,9 +31,7 @@ def discover_queries(
     run any connector itself - purely a suggestion step, run before or
     alongside `gcia.ingestion.run_ingestion`.
     """
-    provider = (
-        AnthropicProvider() if settings.anthropic_api_key else MockProvider(fixed_response=_NO_KEY_RESPONSE)
-    )
+    provider = resolve_provider(_NO_KEY_RESPONSE)
     context = RunContext(
         tenant_id="api",
         budget=Budget(
