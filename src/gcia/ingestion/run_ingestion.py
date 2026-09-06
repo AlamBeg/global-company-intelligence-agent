@@ -147,6 +147,7 @@ def run(
                 source_record_id=discussion.discussion_id,
                 original_url=discussion.original_url,
                 platform=discussion.platform,
+                title=discussion.title,
                 observed_at=discussion.published_at,
                 claim_supported=f"Sentiment: {sentiment_result.overall_label}",
                 excerpt=discussion.content[:280],
@@ -165,6 +166,10 @@ def run(
                     "intents": intent_result.intents,
                     "claim_count": len(claims),
                     "url_status": discussion.url_status,
+                    # Real engagement (Reddit score/num_comments) when the
+                    # connector provides it; empty dict for RSS, which has
+                    # no engagement metrics - never fabricated.
+                    "engagement": discussion.engagement,
                 },
             )
             ingested += 1

@@ -10,6 +10,7 @@ class Evidence(BaseModel):
     source_record_id: str
     original_url: str | None
     platform: str
+    title: str | None = None
     observed_at: datetime | None
     claim_supported: str
     excerpt: str

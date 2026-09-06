@@ -183,22 +183,36 @@
   .ptab.active { background: var(--accent); color: white; border-color: var(--accent); }
   .discussion {
     background: #fff; border: 1px solid var(--panel-border); border-radius: 12px;
-    padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+    padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center;
   }
-  .discussion .content { flex: 1; }
-  .discussion .excerpt { font-size: 14px; margin: 6px 0 0; color: var(--text); }
-  .discussion .claim { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .discussion-icon {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--gray-bg); color: var(--muted);
+    display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
+  }
+  .discussion .content { flex: 1; min-width: 0; }
+  .discussion .title {
+    font-size: 14px; font-weight: 700; color: #0f172a; margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .discussion .subtitle { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .discussion .excerpt { font-size: 12.5px; margin: 6px 0 0; color: var(--muted); }
+  .discussion .claim { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .discussion-meta {
+    display: flex; flex-direction: row; align-items: center; gap: 14px; flex-shrink: 0;
+  }
+  .engagement { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .engagement span + span { margin-left: 10px; }
   .platform-badge {
     font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted);
-    border: 1px solid var(--panel-border); border-radius: 5px; padding: 2px 6px; margin-right: 6px;
+    border: 1px solid var(--panel-border); border-radius: 5px; padding: 2px 6px;
   }
   .tag { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
   .tag.positive { background: var(--green-bg); color: var(--green); }
   .tag.negative { background: var(--red-bg); color: var(--red); }
   .tag.neutral { background: var(--gray-bg); color: #4b5563; }
   .open-link {
-    font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; margin-top: 4px;
-    display: inline-block; font-weight: 600;
+    font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap;
+    font-weight: 600;
   }
 
   #worldMap { width: 100%; height: 300px; }
@@ -566,28 +580,66 @@ function donut(positivePct, negativePct) {
   return `<div class="donut" style="background:${gradient}"></div>`;
 }
 
+const PLATFORM_ICONS = { rss: '📰', reddit: '👽' };
+
+function platformIcon(platform) {
+  return PLATFORM_ICONS[platform] || '🌐';
+}
+
+function timeAgo(iso) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const diffMinutes = Math.round((Date.now() - then) / 60000);
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+function sentimentLabel(claimSupported) {
+  const label = (claimSupported || '').toLowerCase();
+  if (label.includes('positive')) return { cls: 'positive', text: 'Positive' };
+  if (label.includes('negative')) return { cls: 'negative', text: 'Negative' };
+  if (label.includes('mixed')) return { cls: 'neutral', text: 'Mixed' };
+  if (label.includes('neutral')) return { cls: 'neutral', text: 'Neutral' };
+  return null;
+}
+
 function evidenceRow(e) {
-  const label = (e.claim_supported || '').toLowerCase();
-  const tagClass = label.includes('positive') ? 'positive' : label.includes('negative') ? 'negative' : 'neutral';
+  const sentiment = sentimentLabel(e.claim_supported);
   const labels = e.analytical_labels || {};
-  const emotions = Object.keys(labels.emotions || {});
-  const intents = labels.intents || [];
-  const extra = [
-    emotions.length ? `emotions: ${emotions.join(', ')}` : null,
-    intents.length ? `intent: ${intents.join(', ')}` : null,
-    labels.url_status ? `url ${labels.url_status}` : null,
-  ].filter(Boolean).join(' · ');
+  const engagement = labels.engagement || {};
+
+  const subtitleParts = [
+    e.platform,
+    timeAgo(e.observed_at),
+    e.country,
+  ].filter(Boolean);
+
+  const engagementParts = [
+    engagement.score !== undefined ? `<span>🔁 ${engagement.score}</span>` : null,
+    engagement.num_comments !== undefined ? `<span>💬 ${engagement.num_comments}</span>` : null,
+  ].filter(Boolean);
+
+  const headline = e.title || e.excerpt.replace(/<[^>]*>/g, '').trim().slice(0, 90) || 'Untitled discussion';
+
   return `
     <div class="discussion">
+      <div class="discussion-icon">${platformIcon(e.platform)}</div>
       <div class="content">
-        <span class="platform-badge">${escapeHtml(e.platform || '?')}</span>
-        <span class="tag ${tagClass}">${escapeHtml(e.claim_supported || 'unlabeled')}</span>
-        <div class="excerpt">${escapeHtml(e.excerpt)}</div>
-        <div class="claim">confidence ${e.confidence.toFixed(2)}${extra ? ' · ' + escapeHtml(extra) : ''}</div>
+        <p class="title">${escapeHtml(headline)}</p>
+        <div class="subtitle">${escapeHtml(subtitleParts.join(' · '))}</div>
       </div>
-      <a class="open-link" href="${e.original_url || '#'}" target="_blank" rel="noopener">
-        ${e.original_url ? 'Open Link ↗' : 'no source URL'}
-      </a>
+      <div class="discussion-meta">
+        ${sentiment ? `<span class="tag ${sentiment.cls}">${sentiment.text}</span>` : ''}
+        ${engagementParts.length ? `<span class="engagement">${engagementParts.join('')}</span>` : ''}
+        <a class="open-link" href="${e.original_url || '#'}" target="_blank" rel="noopener">
+          ${e.original_url ? 'Open Link ↗' : 'no source URL'}
+        </a>
+      </div>
     </div>`;
 }
 
