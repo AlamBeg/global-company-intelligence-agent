@@ -5,7 +5,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from gcia.api.routes import ask, briefing, company, compare, discovery, evidence, trend
+from gcia.api.routes import ask, briefing, company, compare, discovery, entity, evidence, trend
 
 app = FastAPI(
     title="Global Company Intelligence Agent API",
@@ -13,6 +13,7 @@ app = FastAPI(
     description="Lane 3 (on-demand) surface: company profiles, evidence, comparisons, and briefings.",
 )
 
+app.include_router(entity.router)
 app.include_router(company.router)
 app.include_router(evidence.router)
 app.include_router(compare.router)

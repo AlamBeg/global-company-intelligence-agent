@@ -13,6 +13,14 @@ a fixture and asserts on the API response, not just internal function
 returns. Also manually verified against a running server (`uvicorn`) with
 real HTTP calls via `curl`, not just `TestClient`.
 
+### Entity resolution
+`POST /v1/resolve-company` (`agents/entity.py`) resolves a free-text
+identifier (name, alias, ticker, domain) to a canonical company via a small
+seed registry - deterministic, no LLM call. Unrecognized input resolves to
+a new canonical entity (slugified) rather than failing, per FR-001. This was
+the one previously-undocumented gap among the 21 agents in
+`MULTI_AGENT_ARCHITECTURE.md` - it is now wired.
+
 ### Connectors
 - **RSS** (`connectors/rss_news.py`) — real XML parsing, tested against a
   fixture and structurally sound for real feeds.
