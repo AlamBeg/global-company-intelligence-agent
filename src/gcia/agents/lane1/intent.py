@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from gcia.common.agent import Agent, ModelTier
+from gcia.common.coercion import coerce_str_list
 from gcia.common.context import RunContext
 from gcia.common.model_gateway import prompt_cache_key
 from gcia.schemas.assessments import IntentAssessment
@@ -10,7 +11,8 @@ _SYSTEM = (
     "You detect behavioral intent signals in text (purchase, recommendation, "
     "churn, complaint, support-seeking, advocacy, comparison, investment, "
     'hiring, boycott) only when evidence supports them. Respond with JSON: '
-    '{"intents": list, "confidence": float}.'
+    '{"intents": ["purchase", "complaint"], "confidence": float} - "intents" '
+    "must be a list of plain strings from that fixed set, never objects."
 )
 
 
@@ -30,7 +32,7 @@ class IntentAgent(Agent[Discussion, IntentAssessment]):
         )
         return IntentAssessment(
             discussion_id=input.discussion_id,
-            intents=list(result.output.get("intents", [])),
+            intents=coerce_str_list(result.output.get("intents", [])),
             confidence=float(result.output.get("confidence", 0.0)),
             agent_version=self.version,
         )

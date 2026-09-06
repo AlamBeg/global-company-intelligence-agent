@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from gcia.common.coercion import coerce_float_dict
+from gcia.common.coercion import coerce_float_dict, coerce_str_list
 
 
 def test_passes_through_real_numbers():
@@ -34,3 +34,24 @@ def test_non_dict_input_returns_empty_dict():
 
 def test_booleans_are_not_treated_as_numbers():
     assert coerce_float_dict({"flag": True}) == {}
+
+
+def test_str_list_passes_through_plain_strings():
+    assert coerce_str_list(["purchase", "complaint"]) == ["purchase", "complaint"]
+
+
+def test_str_list_extracts_name_from_wrapped_objects():
+    # Exact failure mode hit live with a local Ollama model: IntentAgent's
+    # "intents" list came back as [{"name": "purchase", "confidence": 0.8}]
+    # instead of ["purchase"], crashing IntentAssessment validation.
+    result = coerce_str_list([{"name": "purchase", "confidence": 0.8}, "complaint"])
+    assert result == ["purchase", "complaint"]
+
+
+def test_str_list_drops_unrecognized_entries_without_raising():
+    assert coerce_str_list([{"confidence": 0.8}, 42, None]) == []
+
+
+def test_str_list_non_list_input_returns_empty_list():
+    assert coerce_str_list("not a list") == []
+    assert coerce_str_list(None) == []

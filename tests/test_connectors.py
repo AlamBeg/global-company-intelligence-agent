@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import pathlib
 from datetime import datetime, timezone
+from io import BytesIO
 
 from gcia.connectors.reddit_public import RedditPublicConnector
 from gcia.connectors.rss_news import RssNewsConnector
+from gcia.connectors.youtube_public import YouTubeConnector
 
 _FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
@@ -59,3 +62,64 @@ def test_reddit_connector_maps_engagement_metrics():
     assert records["abc123"].original_url == (
         "https://www.reddit.com/r/technology/comments/abc123/acme_corp_just_shipped_a_great_update/"
     )
+
+
+_YOUTUBE_SEARCH_RESPONSE = {
+    "items": [
+        {"id": {"videoId": "vid1"}, "snippet": {"title": "Tesla Cybertruck review"}},
+        {"id": {"kind": "youtube#channel"}, "snippet": {"title": "no videoId - should be skipped"}},
+    ]
+}
+
+_YOUTUBE_COMMENTS_RESPONSE = {
+    "items": [
+        {
+            "snippet": {
+                "topLevelComment": {
+                    "id": "comment1",
+                    "snippet": {
+                        "authorDisplayName": "@some_fan",
+                        "textDisplay": "This car looks amazing!",
+                        "likeCount": 12,
+                        "publishedAt": "2026-09-04T12:34:56Z",
+                    },
+                },
+                "totalReplyCount": 3,
+            }
+        },
+        {
+            "snippet": {
+                "topLevelComment": {"snippet": {"textDisplay": "no id - should be skipped"}},
+                "totalReplyCount": 0,
+            }
+        },
+    ]
+}
+
+
+def _fake_urlopen(request, timeout=10):
+    url = request.full_url if hasattr(request, "full_url") else request
+    payload = _YOUTUBE_COMMENTS_RESPONSE if "commentThreads" in url else _YOUTUBE_SEARCH_RESPONSE
+    return BytesIO(json.dumps(payload).encode())
+
+
+def test_youtube_connector_skips_search_results_without_a_video_id(monkeypatch):
+    monkeypatch.setattr("gcia.connectors.youtube_public.urllib.request.urlopen", _fake_urlopen)
+    records = list(YouTubeConnector("Tesla", api_key="fake-key").collect())
+
+    assert len(records) == 1
+    assert records[0].source_native_id == "comment1"
+
+
+def test_youtube_connector_maps_engagement_and_url(monkeypatch):
+    monkeypatch.setattr("gcia.connectors.youtube_public.urllib.request.urlopen", _fake_urlopen)
+    records = list(YouTubeConnector("Tesla", api_key="fake-key").collect())
+
+    record = records[0]
+    assert record.platform == "youtube"
+    assert record.title == "Tesla Cybertruck review"
+    assert record.content == "This car looks amazing!"
+    assert record.author_public_name == "@some_fan"
+    assert record.engagement == {"score": 12, "num_comments": 3}
+    assert record.original_url == "https://www.youtube.com/watch?v=vid1&lc=comment1"
+    assert record.published_at == datetime(2026, 9, 4, 12, 34, 56, tzinfo=timezone.utc)

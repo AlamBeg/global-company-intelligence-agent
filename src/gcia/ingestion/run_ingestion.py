@@ -11,6 +11,10 @@ Usage:
     python -m gcia.ingestion.run_ingestion \\
         --company-id acme --company-name "Acme Corp" \\
         --connector rss --feed-url https://example.com/feed.xml
+
+    python -m gcia.ingestion.run_ingestion \\
+        --company-id tesla --company-name "Tesla, Inc." \\
+        --connector youtube --feed-url "Tesla"
 """
 from __future__ import annotations
 
@@ -32,6 +36,7 @@ from gcia.common.context import Budget, RunContext
 from gcia.common.model_gateway import ModelGateway, resolve_provider
 from gcia.connectors.reddit_public import RedditPublicConnector
 from gcia.connectors.rss_news import RssNewsConnector
+from gcia.connectors.youtube_public import YouTubeConnector
 from gcia.schemas.company import Company
 from gcia.schemas.evidence import Evidence
 from gcia.storage import repository
@@ -62,7 +67,13 @@ def _build_connector(connector_name: str, source_url: str):
         return RssNewsConnector(source_url)
     if connector_name == "reddit":
         return RedditPublicConnector(source_url)
-    raise ValueError(f"unknown connector: {connector_name!r} (expected 'rss' or 'reddit')")
+    if connector_name == "youtube":
+        if not settings.youtube_api_key:
+            raise ValueError(
+                "YOUTUBE_API_KEY not configured - set it in .env before using --connector youtube"
+            )
+        return YouTubeConnector(source_url, api_key=settings.youtube_api_key)
+    raise ValueError(f"unknown connector: {connector_name!r} (expected 'rss', 'reddit', or 'youtube')")
 
 
 def run(
@@ -185,8 +196,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--company-id", required=True)
     parser.add_argument("--company-name", required=True)
-    parser.add_argument("--feed-url", required=True, help="RSS feed URL or Reddit listing URL")
-    parser.add_argument("--connector", default="rss", choices=["rss", "reddit"])
+    parser.add_argument(
+        "--feed-url",
+        required=True,
+        help="RSS feed URL, Reddit listing URL, or (for --connector youtube) a search query",
+    )
+    parser.add_argument("--connector", default="rss", choices=["rss", "reddit", "youtube"])
     parser.add_argument(
         "--limit", type=int, default=None, help="max raw items to process (default: no cap)"
     )
