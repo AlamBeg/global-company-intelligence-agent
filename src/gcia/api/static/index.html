@@ -608,15 +608,23 @@ function sentimentLabel(claimSupported) {
   return null;
 }
 
+// Platforms whose "title" names a shared parent (e.g. the YouTube video a
+// comment was left on), not the discussion itself - a comment's real
+// headline is its own text, and the parent title belongs in the subtitle
+// instead, or every comment on that video would render an identical row.
+const PARENT_TITLE_PLATFORMS = new Set(['youtube']);
+
 function evidenceRow(e) {
   const sentiment = sentimentLabel(e.claim_supported);
   const labels = e.analytical_labels || {};
   const engagement = labels.engagement || {};
+  const hasParentTitle = PARENT_TITLE_PLATFORMS.has(e.platform);
 
   const subtitleParts = [
     e.platform,
     timeAgo(e.observed_at),
     e.country,
+    hasParentTitle && e.title ? `on: ${e.title}` : null,
   ].filter(Boolean);
 
   const engagementParts = [
@@ -624,7 +632,8 @@ function evidenceRow(e) {
     engagement.num_comments !== undefined ? `<span>💬 ${engagement.num_comments}</span>` : null,
   ].filter(Boolean);
 
-  const headline = e.title || e.excerpt.replace(/<[^>]*>/g, '').trim().slice(0, 90) || 'Untitled discussion';
+  const strippedExcerpt = e.excerpt.replace(/<[^>]*>/g, '').trim().slice(0, 90);
+  const headline = (hasParentTitle ? strippedExcerpt : e.title) || strippedExcerpt || e.title || 'Untitled discussion';
 
   return `
     <div class="discussion">
