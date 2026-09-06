@@ -7,11 +7,50 @@ isn't wired yet, regardless of what the PRD describes.
 
 ## What's built, tested, and live-verified
 
-**21 tests passing** (`pytest`, `tests/`), including a full end-to-end
+**45 tests passing** (`pytest`, `tests/`), including a full end-to-end
 integration test (`test_end_to_end.py`) that runs the real pipeline against
 a fixture and asserts on the API response, not just internal function
 returns. Also manually verified against a running server (`uvicorn`) with
-real HTTP calls via `curl`, not just `TestClient`.
+real HTTP calls via `curl` and against an actual browser (via automation),
+not just `TestClient`.
+
+### Real AI analysis is confirmed working (Ollama, local)
+Both provided Anthropic and OpenAI API keys authenticate correctly but have
+no usable billing on either account. Rather than stay blocked, added
+**Ollama** (`agents`/`common/model_gateway.py`'s `OllamaProvider`) as a
+third, genuinely free, local model provider — installed on this machine,
+`llama3.2` (fast tier) and `llama3.1` (large tier) pulled, and verified with
+a real, non-mocked, end-to-end ingestion + Lane 2 run. Real output is
+meaningfully differentiated (e.g. an earnings article correctly scored
+positive with excitement/pride emotions; a complaints article scored
+negative with anger/frustration; an unrelated weather article correctly
+excluded as irrelevant) - not the flat "neutral everywhere" placeholder
+output every prior verification in this file was limited to.
+`GCIA_MODEL_PROVIDER` in `.env` switches provider; switching back to
+`anthropic`/`openai` needs no code change once either account has credits.
+
+**Real local-model testing surfaced three genuine bugs, now fixed:**
+1. `aspect_sentiment`/`emotions` (typed `dict[str, float]`) crashed the
+   pipeline when the local model returned word labels ("positive") instead
+   of numbers - fixed with `common/coercion.py`'s `coerce_float_dict`, used
+   by both `SentimentAgent` and `EmotionAgent`, plus a clearer prompt.
+2. `list_relevant_discussions` joined `RelevanceRecord` to `DiscussionRecord`
+   on `discussion_id` alone, not also `company_id` - since discussion_id is
+   a content hash, two companies ingesting identical content (as happened
+   here: `acme` in placeholder mode and `acme-real` via Ollama both ingested
+   the same fixture) could leak one company's relevance judgment into
+   another's Lane 2 input. Fixed; regression test in
+   `test_relevance_isolation.py`.
+3. `get_company_summary`'s sentiment aggregate had the same gap - it wasn't
+   filtered by relevance at all, so an irrelevant discussion's leftover
+   sentiment (shared cross-company by design, since `SentimentRecord` is
+   keyed by content hash alone) could skew the headline sentiment score.
+   Fixed with the same join pattern; also regression-tested.
+
+Both bugs were invisible under placeholder mode (every item was neutral, so
+nothing looked wrong) and only surfaced once real, differentiated data
+existed - a concrete argument for finishing real-provider verification
+early rather than developing exclusively against the mock path.
 
 ### Entity resolution
 `POST /v1/resolve-company` (`agents/entity.py`) resolves a free-text
@@ -76,8 +115,18 @@ result is not the flat placeholder constant.
 - `POST /v1/briefings/{id}/export?format=markdown|json` — executive
   briefing export (FR-032); PDF/slide export is **not built**.
 - `GET /v1/evidence/{id}` — raw evidence lookup.
-- Dashboard at `/dashboard` — dark-themed UI covering all of the above,
-  including an "Ask" panel and an API-key input for RBAC.
+- Dashboard at `/dashboard` — redesigned against a provided reference
+  mockup: sidebar nav (only Overview/Ask functional, everything else
+  explicitly marked "not built" rather than faked), hero section with
+  honest capability facts, real Discussion Sources donut, a real
+  interactive choropleth world map (jsvectormap via CDN, colored by actual
+  per-country counts - hit and fixed a real library API bug during
+  integration, documented in the commit), topic progress bars, a
+  platform-filterable evidence feed, a working Compare panel, and the AI
+  Analyst Ask panel. Screenshots of the live dashboard:
+  `docs/current_dashboard_top.jpg`, `docs/current_dashboard_geo.jpg`,
+  `docs/current_dashboard_real_ollama.jpg` (this last one shows real,
+  non-placeholder Ollama output).
 
 ### Cross-cutting
 - **RBAC** (NFR-011): `viewer`/`analyst`/`admin` roles enforced at the API
@@ -98,16 +147,17 @@ result is not the flat placeholder constant.
 
 ## Known blockers / honest gaps
 
-- **No live LLM verification**: the provided Anthropic API key returned
-  `credit balance too low` — everything above has only been exercised
-  through the documented placeholder path (`MockProvider`), never against a
-  real model response. The code path is identical either way (same
-  `ModelGateway.complete()` call), but "the JSON parses and scores look
-  sane" has not been confirmed against actual Claude output. Add billing
-  credits, uncomment `ANTHROPIC_API_KEY` in `.env`, and re-run
-  `gcia.ingestion.run_ingestion` / `gcia.workflows.run_company_window` to
-  verify this.
-- **That API key should be rotated** — it was pasted into a chat session.
+- **Anthropic and OpenAI accounts both have no usable credit** - real
+  analysis is confirmed working, but only via the local Ollama path, which
+  is meaningfully lower quality than either frontier model. Add billing to
+  either account and flip `GCIA_MODEL_PROVIDER` to verify with a stronger
+  model - no code change needed.
+- **All three API keys handled in this session should be rotated** - the
+  Anthropic key, the OpenAI key, and (less critically, since it never left
+  the local machine) nothing needed for Ollama. All were pasted into a chat
+  session at some point.
+- Local Ollama inference is slow on CPU (tens of seconds per call) - fine
+  for a demo/dev loop, not for any real ingestion volume.
 - Only 2 of the "Social platforms" and "News and media" source classes in
   FR-004 exist (RSS, Reddit). No multilingual support, no X/YouTube/TikTok/
   Instagram/Facebook/LinkedIn connectors, no non-English language handling.

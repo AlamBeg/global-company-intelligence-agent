@@ -58,12 +58,13 @@ def test_falls_back_to_mock_when_openai_selected_but_no_key():
 
 
 def test_falls_back_to_mock_when_ollama_selected_but_unreachable():
-    # No Ollama server runs in CI/test environments, so this exercises the
-    # real reachability check rather than mocking it away.
+    # Point at a port nothing listens on rather than assuming no Ollama runs
+    # in the test environment - it does on this machine as of 2026-09-06,
+    # which is exactly the real reachability check working correctly.
     _reset_settings()
     try:
         settings.gcia_model_provider = "ollama"
-        settings.gcia_ollama_base_url = "http://localhost:11434/v1"
+        settings.gcia_ollama_base_url = "http://localhost:1/v1"
         provider = resolve_provider({"answer": "placeholder"})
         assert isinstance(provider, MockProvider)
     finally:

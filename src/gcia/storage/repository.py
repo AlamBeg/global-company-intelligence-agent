@@ -151,10 +151,22 @@ def save_evidence(
 def list_relevant_discussions(session: Session, company_id: str) -> list[Discussion]:
     """Lane 2 input: only discussions Lane 1's RelevanceAgent marked relevant
     (FR-008) - irrelevant items are excluded from company-level clustering,
-    topics, and risk."""
+    topics, and risk.
+
+    The join must match on company_id as well as discussion_id: identical
+    content (e.g. two companies ingesting the same feed) produces the same
+    discussion_id, and RelevanceRecord's primary key is the
+    (discussion_id, company_id) pair - joining on discussion_id alone once
+    let a *different* company's relevance judgment for the same content leak
+    into this company's Lane 2 input (caught by test_relevance_isolation.py).
+    """
     rows = (
         session.query(DiscussionRecord)
-        .join(RelevanceRecord, RelevanceRecord.discussion_id == DiscussionRecord.discussion_id)
+        .join(
+            RelevanceRecord,
+            (RelevanceRecord.discussion_id == DiscussionRecord.discussion_id)
+            & (RelevanceRecord.company_id == DiscussionRecord.company_id),
+        )
         .filter(DiscussionRecord.company_id == company_id, RelevanceRecord.is_relevant.is_(True))
         .all()
     )
@@ -278,10 +290,19 @@ def get_company_summary(session: Session, company_id: str) -> dict | None:
     discussions = (
         session.query(DiscussionRecord).filter(DiscussionRecord.company_id == company_id).all()
     )
+    # Gated by relevance, same as Lane 2 (list_relevant_discussions) and
+    # evidence: an irrelevant discussion's sentiment - which can be a stale
+    # value shared via SentimentRecord's cross-company content-level key -
+    # must not move this company's headline sentiment score.
     sentiments = (
         session.query(SentimentRecord)
         .join(DiscussionRecord, DiscussionRecord.discussion_id == SentimentRecord.discussion_id)
-        .filter(DiscussionRecord.company_id == company_id)
+        .join(
+            RelevanceRecord,
+            (RelevanceRecord.discussion_id == DiscussionRecord.discussion_id)
+            & (RelevanceRecord.company_id == DiscussionRecord.company_id),
+        )
+        .filter(DiscussionRecord.company_id == company_id, RelevanceRecord.is_relevant.is_(True))
         .all()
     )
     evidence = session.query(EvidenceRecord).filter(EvidenceRecord.company_id == company_id).all()
