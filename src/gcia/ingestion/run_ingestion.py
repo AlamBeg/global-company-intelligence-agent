@@ -65,7 +65,19 @@ def _build_connector(connector_name: str, source_url: str):
     raise ValueError(f"unknown connector: {connector_name!r} (expected 'rss' or 'reddit')")
 
 
-def run(company_id: str, canonical_name: str, source_url: str, connector_name: str = "rss") -> int:
+def run(
+    company_id: str,
+    canonical_name: str,
+    source_url: str,
+    connector_name: str = "rss",
+    limit: int | None = None,
+) -> int:
+    """`limit` caps how many raw items from the connector are processed -
+    mainly a cost/time control: with a real LLM provider, each item costs
+    several model calls (relevance, sentiment, emotion, intent, claim), so
+    an unbounded feed (Google News RSS can return 100 items) can take a long
+    time on a slow provider (e.g. local Ollama on CPU). None means no cap.
+    """
     init_db()
     provider = resolve_provider(_NO_KEY_FALLBACK_RESPONSE)
 
@@ -95,7 +107,9 @@ def run(company_id: str, canonical_name: str, source_url: str, connector_name: s
 
         connector = _build_connector(connector_name, source_url)
         ingested = 0
-        for raw in connector.collect():
+        for item_number, raw in enumerate(connector.collect(), start=1):
+            if limit is not None and item_number > limit:
+                break
             discussion = normalization.run(raw, context)
 
             # Cheap, deterministic Lane 1 steps (NONE tier) run on every item
@@ -168,8 +182,17 @@ def main() -> None:
     parser.add_argument("--company-name", required=True)
     parser.add_argument("--feed-url", required=True, help="RSS feed URL or Reddit listing URL")
     parser.add_argument("--connector", default="rss", choices=["rss", "reddit"])
+    parser.add_argument(
+        "--limit", type=int, default=None, help="max raw items to process (default: no cap)"
+    )
     args = parser.parse_args()
-    count = run(args.company_id, args.company_name, args.feed_url, connector_name=args.connector)
+    count = run(
+        args.company_id,
+        args.company_name,
+        args.feed_url,
+        connector_name=args.connector,
+        limit=args.limit,
+    )
     print(f"ingested {count} relevant discussions for {args.company_id}")
 
 
