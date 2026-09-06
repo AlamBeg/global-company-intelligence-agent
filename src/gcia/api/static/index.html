@@ -22,6 +22,7 @@
     color: var(--text);
     margin: 0;
     padding: 0 0 48px;
+    overflow-x: hidden;
   }
   header {
     padding: 16px 28px;
@@ -53,7 +54,10 @@
   .card {
     background: var(--panel); border: 1px solid var(--panel-border);
     border-radius: 12px; padding: 18px;
+    min-width: 0; overflow-wrap: anywhere;
   }
+  .scroll-list { max-height: 220px; overflow-y: auto; }
+  .list-more { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
   .card h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
   .big-number { font-size: 32px; font-weight: 700; margin: 6px 0; }
   .sub { color: var(--muted); font-size: 13px; }
@@ -197,30 +201,51 @@ const TEMPLATE = (data) => {
     </div>
 
     <div class="section-title">Evidence (${data.evidence.length})</div>
-    ${data.evidence.length ? data.evidence.map(evidenceRow).join('') : '<div class="placeholder">No evidence yet — run ingestion for this company.</div>'}
+    ${evidenceListHtml(data.evidence)}
   `;
 };
 
+const MAX_EVIDENCE_SHOWN = 30;
+
+function evidenceListHtml(evidence) {
+  if (!evidence.length) return '<div class="placeholder">No evidence yet — run ingestion for this company.</div>';
+  const shown = evidence.slice(0, MAX_EVIDENCE_SHOWN).map(evidenceRow).join('');
+  const more = evidence.length > MAX_EVIDENCE_SHOWN
+    ? `<p class="muted">+${evidence.length - MAX_EVIDENCE_SHOWN} more not shown here — use the API (/v1/companies/{id}) or briefing export for the full list.</p>`
+    : '';
+  return shown + more;
+}
+
 const LANE2_HINT = 'Not yet available — run <code>python -m gcia.workflows.run_company_window</code> for this company.';
+const MAX_LIST_ITEMS = 8;
 
 function topicsHtml(topics) {
   if (!topics || !topics.length) return `<div class="placeholder">${LANE2_HINT}</div>`;
-  return topics.map(t => `
-    <div style="display:flex;justify-content:space-between;font-size:13px;margin:8px 0;">
+  const sorted = [...topics].sort((a, b) => b.volume - a.volume);
+  const shown = sorted.slice(0, MAX_LIST_ITEMS).map(t => `
+    <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:8px 0;">
       <span>${escapeHtml(t.label)}</span>
-      <span class="muted">${t.volume} &middot; conf ${t.confidence.toFixed(2)}</span>
+      <span class="muted" style="white-space:nowrap;">${t.volume} &middot; conf ${t.confidence.toFixed(2)}</span>
     </div>`).join('');
+  const more = sorted.length > MAX_LIST_ITEMS
+    ? `<div class="list-more">+${sorted.length - MAX_LIST_ITEMS} more (mostly singleton clusters — naive word-overlap clustering, see docs/MVP_ROADMAP.md)</div>`
+    : '';
+  return `<div class="scroll-list">${shown}</div>${more}`;
 }
 
 function dedupHtml(dedup, narratives) {
   if (!dedup) return `<div class="placeholder">${LANE2_HINT}</div>`;
-  const narrativeLines = (narratives || []).map(n => `
+  const list = narratives || [];
+  const shown = list.slice(0, MAX_LIST_ITEMS).map(n => `
     <div style="font-size:12px;margin:4px 0;" class="muted">${escapeHtml(n.label)} (${n.size} discussion(s))</div>
   `).join('');
+  const more = list.length > MAX_LIST_ITEMS
+    ? `<div class="list-more">+${list.length - MAX_LIST_ITEMS} more</div>`
+    : '';
   return `
     <div class="big-number" style="font-size:22px">${dedup.duplicate_clusters}</div>
     <div class="sub">duplicate cluster(s) &middot; ${dedup.duplicate_discussions_grouped} discussion(s) grouped, not double-counted</div>
-    ${narrativeLines}`;
+    <div class="scroll-list">${shown}</div>${more}`;
 }
 
 function geoHtml(geography) {
