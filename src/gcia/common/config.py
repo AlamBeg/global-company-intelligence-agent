@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     gcia_openai_model_small: str = "gpt-4o-mini"
     gcia_openai_model_large: str = "gpt-4o"
 
+    # Ollama (https://ollama.com): a local model server - genuinely free, no
+    # API key, no billing account, no "out of credits" risk, since it's your
+    # own machine. Requires Ollama installed and running, with the model
+    # pulled (e.g. `ollama pull llama3.2`).
+    gcia_ollama_base_url: str = "http://localhost:11434/v1"
+    gcia_ollama_model_small: str = "llama3.2"
+    gcia_ollama_model_large: str = "llama3.1"
+
     gcia_max_tokens_per_run: int = 200_000
     gcia_max_cost_usd_per_run: float = 5.00
 

@@ -115,6 +115,40 @@ class OpenAIProvider:
         return parsed, usage.prompt_tokens, usage.completion_tokens
 
 
+class OllamaProvider:
+    """Talks to a local Ollama server (https://ollama.com) via its
+    OpenAI-compatible endpoint - reuses the openai SDK with a local base_url
+    rather than a separate client library. Genuinely free and has no
+    "insufficient credits" failure mode, since it's the user's own machine -
+    but it does require Ollama installed, running, and the configured model
+    pulled (`ollama pull llama3.2`), and local model quality/JSON-following
+    is generally weaker than a frontier hosted model.
+    """
+
+    def complete_json(
+        self, *, model: str, system: str, prompt: str, schema_hint: str
+    ) -> tuple[dict[str, Any], int, int]:
+        import openai
+
+        client = openai.OpenAI(base_url=settings.gcia_ollama_base_url, api_key="ollama")
+        response = client.chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{system}\n\nRespond with JSON matching this shape:\n{schema_hint}",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        parsed = json.loads(response.choices[0].message.content)
+        usage = response.usage
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
+        return parsed, input_tokens, output_tokens
+
+
 class MockProvider:
     """Deterministic stand-in for tests and local dev without API access."""
 
@@ -142,15 +176,23 @@ _MODEL_NAMES_BY_PROVIDER = {
         ModelTier.SMALL: lambda: settings.gcia_openai_model_small,
         ModelTier.LARGE: lambda: settings.gcia_openai_model_large,
     },
+    "ollama": {
+        ModelTier.SMALL: lambda: settings.gcia_ollama_model_small,
+        ModelTier.LARGE: lambda: settings.gcia_ollama_model_large,
+    },
+}
+
+_PROVIDER_CLASSES: dict[str, type] = {
+    "anthropic": AnthropicProvider,
+    "openai": OpenAIProvider,
+    "ollama": OllamaProvider,
 }
 
 
 class ModelGateway:
     def __init__(self, provider: Provider | None = None, provider_kind: str | None = None):
         self.provider_kind = provider_kind or settings.gcia_model_provider
-        self.provider = provider or (
-            OpenAIProvider() if self.provider_kind == "openai" else AnthropicProvider()
-        )
+        self.provider = provider or _PROVIDER_CLASSES.get(self.provider_kind, AnthropicProvider)()
         self._cache: dict[str, ModelCallResult] = {}
 
     def _model_for(self, tier: str) -> str:
@@ -224,27 +266,51 @@ def prompt_cache_key(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
+def _ollama_reachable() -> bool:
+    import urllib.error
+    import urllib.request
+
+    try:
+        base = settings.gcia_ollama_base_url.removesuffix("/v1")
+        urllib.request.urlopen(f"{base}/api/tags", timeout=2)
+        return True
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
 def resolve_provider(fallback_response: dict[str, Any]) -> Provider:
     """Single decision point every entrypoint (ingestion, Lane 2, ask,
     discovery) uses to pick a provider, instead of each repeating its own
-    if/else: honors GCIA_MODEL_PROVIDER (anthropic|openai, default
+    if/else: honors GCIA_MODEL_PROVIDER (anthropic|openai|ollama, default
     anthropic), falls back to MockProvider with a logged warning when the
-    matching API key isn't configured - never silently uses a different
-    provider than the one requested.
+    selected provider isn't actually usable - never silently uses a
+    different provider than the one requested.
     """
-    if settings.gcia_model_provider == "openai":
+    provider_kind = settings.gcia_model_provider
+
+    if provider_kind == "openai":
         if settings.openai_api_key:
             return OpenAIProvider()
         logger.warning(
             "GCIA_MODEL_PROVIDER=openai but OPENAI_API_KEY is not set - using a "
             "placeholder response, not real model output."
         )
+    elif provider_kind == "ollama":
+        if _ollama_reachable():
+            return OllamaProvider()
+        logger.warning(
+            "GCIA_MODEL_PROVIDER=ollama but no Ollama server is reachable at %s - "
+            "using a placeholder response, not real model output. Install Ollama "
+            "(https://ollama.com), run `ollama pull %s`, and make sure it's running.",
+            settings.gcia_ollama_base_url,
+            settings.gcia_ollama_model_small,
+        )
     else:
         if settings.anthropic_api_key:
             return AnthropicProvider()
         logger.warning(
             "ANTHROPIC_API_KEY is not set - using a placeholder response, not real "
-            "model output. Set it in .env, or set GCIA_MODEL_PROVIDER=openai with "
-            "OPENAI_API_KEY, for real analysis."
+            "model output. Set it in .env, or set GCIA_MODEL_PROVIDER=openai/ollama "
+            "with the matching config, for real analysis."
         )
     return MockProvider(fixed_response=fallback_response)
