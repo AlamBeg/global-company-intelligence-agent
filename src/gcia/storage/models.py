@@ -19,6 +19,8 @@ class CompanyRecord(Base):
     # Company-level, from CredibilityAgent over Lane 2 canonical discussions -
     # not a truth score (docs/AI_SCORING_MODEL.md).
     credibility_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Company-level average of ImpactAgent over Lane 2 canonical discussions.
+    avg_impact_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class DiscussionRecord(Base):

@@ -45,9 +45,15 @@ asserting the resulting percentage) — not fabricated. A freshly-ingested,
 single-burst dataset will correctly show ~0%/no-baseline, which is the
 honest answer for that data shape, not a bug.
 
-**Impact** (`agents/lane2/impact.py`) is coded (a configurable weighted
-formula) but **not wired** to storage or any runner — it needs
-author-influence and reach signals this MVP doesn't track yet.
+**Impact** (`agents/lane2/impact.py`) is now wired into
+`run_company_window.py` and persisted as a company-level average. Engagement
+(real, from Reddit's `score`/`num_comments` - always 0 for RSS, which has no
+engagement metrics), topic_importance (real, cluster size ratio), and
+propagation (real, whether the item was echoed elsewhere) are genuine
+signals; reach, author_influence, and velocity remain a documented neutral
+placeholder pending follower/author-history tracking and multi-window
+baselines. Verified live and by test (`test_impact_wiring.py`) that the
+result is not the flat placeholder constant.
 
 ### Lane 3 (on-demand) — wired into the API
 - `GET /v1/companies/{id}` — aggregated summary (sentiment, topics,
@@ -115,8 +121,11 @@ author-influence and reach signals this MVP doesn't track yet.
    even when asked to).
 2. Replace the naive word-overlap topic clustering and shingle-based dedup
    with real embedding similarity (needs a vector store).
-3. Wire `ImpactAgent` once reach/engagement signals are richer (currently
-   only Reddit's `score`/`num_comments` are captured; RSS has none).
-4. Add a third connector from a genuinely different class (e.g. a review
-   site or forum) to further stress-test the `Connector` protocol.
+3. Track real reach/author-influence/follower signals so Impact's remaining
+   placeholder inputs (reach, author_influence, velocity) can become real -
+   engagement, topic_importance, and propagation already are.
+4. Add a third connector from a genuinely different, compliant source class
+   (an official review-site or forum API, not ad-hoc scraping - see
+   SOURCE_CONNECTORS.md "Compliance") to further stress-test the `Connector`
+   protocol.
 5. PDF/slide briefing export.

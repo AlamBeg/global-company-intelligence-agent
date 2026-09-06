@@ -51,6 +51,13 @@ def update_company_credibility(session: Session, company_id: str, score: float) 
         session.commit()
 
 
+def update_company_impact(session: Session, company_id: str, score: float) -> None:
+    company = session.get(CompanyRecord, company_id)
+    if company:
+        company.avg_impact_score = score
+        session.commit()
+
+
 def upsert_discussion(session: Session, company_id: str, discussion: Discussion) -> None:
     if session.get(DiscussionRecord, (discussion.discussion_id, company_id)):
         return  # idempotent per (discussion_id, company_id) - NFR-006
@@ -308,6 +315,7 @@ def get_company_summary(session: Session, company_id: str) -> dict | None:
         "canonical_name": company.canonical_name,
         "discussion_count": len(discussions),
         "credibility_score": company.credibility_score,
+        "avg_impact_score": company.avg_impact_score,
         "sentiment": {
             "overall_score": avg_score,
             "positive": positive,
