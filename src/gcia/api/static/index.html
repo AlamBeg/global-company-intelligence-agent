@@ -215,6 +215,42 @@
     font-weight: 600;
   }
 
+  /* live pipeline run */
+  .pipeline-panel {
+    background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 20px;
+  }
+  .pipeline-panel h3 { margin: 0 0 6px; font-size: 16px; }
+  .pipeline-status { font-size: 13px; margin-bottom: 16px; }
+  .pipeline-status.error { color: var(--red); }
+  .pipeline-group { margin-bottom: 14px; }
+  .pipeline-group-label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.03em; margin-bottom: 8px;
+  }
+  .pipeline-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .agent-chip {
+    font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    background: var(--gray-bg); color: var(--muted); border: 1px solid var(--panel-border);
+    display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s, color 0.2s;
+  }
+  .agent-chip::before { content: '○'; font-size: 10px; }
+  .agent-chip.agent-running { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  .agent-chip.agent-running::before { content: '◐'; animation: pipeline-spin 1s linear infinite; }
+  .agent-chip.agent-done { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+  .agent-chip.agent-done::before { content: '●'; }
+  .agent-chip.agent-skipped { background: var(--gray-bg); color: var(--muted); opacity: 0.6; }
+  .agent-chip.agent-skipped::before { content: '—'; }
+  .agent-chip.agent-error { background: var(--red-bg); color: var(--red); border-color: var(--red); }
+  .agent-chip.agent-error::before { content: '✕'; }
+  @keyframes pipeline-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .pipeline-log {
+    margin-top: 14px; max-height: 220px; overflow-y: auto; background: var(--gray-bg);
+    border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 11.5px;
+  }
+  .log-line { padding: 2px 0; color: var(--muted); }
+  .log-line.log-done { color: #0f172a; }
+  .log-line.log-error { color: var(--red); }
+
   #worldMap { width: 100%; height: 300px; }
   .jvm-tooltip { background: #1e2433 !important; border: none !important; color: #fff !important; font-family: inherit !important; }
   .jvm-zoom-btn { background: #fff !important; border: 1px solid var(--panel-border) !important; color: var(--text) !important; }
@@ -282,6 +318,7 @@
     <div class="topbar">
       <input type="text" id="companyId" placeholder="🔍  Search a company_id you've ingested (e.g. acme)" onkeydown="if(event.key==='Enter')load()">
       <button onclick="load()">Analyze</button>
+      <button class="secondary" onclick="runLiveAnalysis()" title="Ingest fresh RSS coverage for this name and run the full agent pipeline live">⚡ Run Live Analysis</button>
       <input type="password" id="apiKey" placeholder="X-API-Key (optional)" onchange="saveApiKey()">
       <span id="freshness"></span>
     </div>
@@ -755,7 +792,9 @@ async function load() {
     return;
   }
   if (!res.ok) {
-    result.innerHTML = `<p class="error">Error ${res.status}: not found, not ingested yet, or missing/invalid API key.</p>`;
+    result.innerHTML = res.status === 404
+      ? `<p class="error">Not ingested yet. Click <strong>⚡ Run Live Analysis</strong> above to fetch real coverage and run the full agent pipeline now.</p>`
+      : `<p class="error">Error ${res.status}: missing/invalid API key.</p>`;
     return;
   }
   currentData = await res.json();
@@ -765,6 +804,132 @@ async function load() {
   document.getElementById('askResult').textContent = `Ready — ask about ${currentData.canonical_name}.`;
   loadTrend(id);
   renderWorldMap(currentData.geography);
+}
+
+const PIPELINE_AGENTS = [
+  {
+    group: 'Lane 1 · per article',
+    agents: ['Normalization', 'Language', 'Geography', 'Verification', 'Relevance', 'Sentiment', 'Emotion', 'Intent', 'Claim'],
+  },
+  {
+    group: 'Lane 2 · company analysis',
+    agents: ['Deduplication', 'Credibility', 'Topic', 'Narrative', 'Risk', 'Impact'],
+  },
+];
+
+function pipelinePanelHTML(companyName) {
+  const groups = PIPELINE_AGENTS.map(g => `
+    <div class="pipeline-group">
+      <div class="pipeline-group-label">${escapeHtml(g.group)}</div>
+      <div class="pipeline-chips">
+        ${g.agents.map(a => `<span class="agent-chip" data-agent="${escapeHtml(a)}">${escapeHtml(a)}</span>`).join('')}
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="pipeline-panel">
+      <h3>Running live analysis for ${escapeHtml(companyName)}</h3>
+      <div id="pipelineStatus" class="pipeline-status muted">Starting…</div>
+      ${groups}
+      <div id="pipelineLog" class="pipeline-log"></div>
+    </div>`;
+}
+
+function setAgentChip(name, status) {
+  const chip = document.querySelector(`.agent-chip[data-agent="${CSS.escape(name)}"]`);
+  if (chip) chip.className = `agent-chip agent-${status}`;
+}
+
+let pipelinePollTimer = null;
+
+async function runLiveAnalysis() {
+  const companyName = document.getElementById('companyId').value.trim();
+  if (!companyName) return;
+  if (pipelinePollTimer) clearTimeout(pipelinePollTimer);
+
+  const result = document.getElementById('result');
+  document.getElementById('empty').classList.add('hidden');
+  result.classList.remove('hidden');
+  result.innerHTML = pipelinePanelHTML(companyName);
+
+  let res;
+  try {
+    res = await fetch('/v1/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+      body: JSON.stringify({ company_name: companyName, limit: 8 }),
+    });
+  } catch (e) {
+    document.getElementById('pipelineStatus').textContent = 'Could not reach the API.';
+    return;
+  }
+  if (!res.ok) {
+    document.getElementById('pipelineStatus').textContent =
+      `Error ${res.status} starting the run (needs an 'analyst' or higher X-API-Key if GCIA_API_KEYS is set).`;
+    return;
+  }
+  const { run_id, company_id } = await res.json();
+  pollRun(run_id, company_id);
+}
+
+async function pollRun(runId, companyId) {
+  const statusEl = document.getElementById('pipelineStatus');
+  const logEl = document.getElementById('pipelineLog');
+  if (!statusEl || !logEl) return; // user navigated away from the panel
+  let seenEvents = 0;
+
+  const tick = async () => {
+    const statusEl = document.getElementById('pipelineStatus');
+    const logEl = document.getElementById('pipelineLog');
+    if (!statusEl || !logEl) return; // panel no longer on screen - stop polling
+
+    let res;
+    try {
+      res = await fetch(`/v1/runs/${encodeURIComponent(runId)}`, { headers: apiHeaders() });
+    } catch (e) {
+      statusEl.textContent = 'Lost connection to the API — retrying…';
+      pipelinePollTimer = setTimeout(tick, 2000);
+      return;
+    }
+    if (!res.ok) {
+      statusEl.textContent = `Error ${res.status} checking run status.`;
+      return;
+    }
+    const run = await res.json();
+
+    for (const [name, info] of Object.entries(run.agents)) {
+      setAgentChip(name, info.status);
+    }
+    const newEvents = run.events.slice(seenEvents);
+    seenEvents = run.events.length;
+    for (const ev of newEvents) {
+      const line = document.createElement('div');
+      line.className = `log-line log-${ev.status}`;
+      line.textContent = `${ev.agent} — ${ev.status}${ev.detail ? ': ' + ev.detail : ''}`;
+      logEl.appendChild(line);
+    }
+    logEl.scrollTop = logEl.scrollHeight;
+
+    if (run.status === 'running' && run.phase === 'lane1' && run.progress.total) {
+      statusEl.textContent = `Lane 1 — analyzing article ${run.progress.item} of ${run.progress.total}…`;
+    } else if (run.status === 'running' && run.phase === 'lane2') {
+      statusEl.textContent = 'Lane 2 — clustering topics, scoring credibility, impact, and risk…';
+    } else if (run.status === 'running') {
+      statusEl.textContent = 'Starting…';
+    }
+
+    if (run.status === 'running') {
+      pipelinePollTimer = setTimeout(tick, 1200);
+    } else if (run.status === 'error') {
+      statusEl.classList.add('error');
+      statusEl.textContent = `Failed: ${run.error}`;
+    } else {
+      statusEl.textContent = 'Done — loading results…';
+      document.getElementById('companyId').value = companyId;
+      setTimeout(() => load(), 600);
+    }
+  };
+  tick();
 }
 
 function hexToRgb(hex) {

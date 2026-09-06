@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from typing import Callable
 
 from gcia.agents.lane2.clustering import naive_topic_clusters
 from gcia.agents.lane2.credibility import CredibilityAgent, CredibilityInputs
@@ -57,7 +58,26 @@ _NEUTRAL_PLACEHOLDER = 0.5
 _ENGAGEMENT_SATURATION_POINT = 100.0
 
 
-def run(company_id: str) -> dict:
+def run(
+    company_id: str,
+    on_step: Callable[[str, str, str | None], None] | None = None,
+) -> dict:
+    """`on_step(agent_name, status, detail)` is an optional hook for a live
+    status view (see gcia.api.run_tracker) - unused by the CLI entrypoint."""
+
+    def step(name: str, fn: Callable[[], object]) -> object:
+        if on_step:
+            on_step(name, "running", None)
+        try:
+            result = fn()
+        except Exception as exc:
+            if on_step:
+                on_step(name, "error", str(exc))
+            raise
+        if on_step:
+            on_step(name, "done", None)
+        return result
+
     init_db()
     provider = resolve_provider(_NO_KEY_FALLBACK_RESPONSE)
 
@@ -81,7 +101,7 @@ def run(company_id: str) -> dict:
 
         repository.clear_lane2_outputs(session, company_id)
 
-        duplicate_clusters = DeduplicationAgent().run(discussions, context)
+        duplicate_clusters = step("Deduplication", lambda: DeduplicationAgent().run(discussions, context))
         for cluster in duplicate_clusters:
             # cluster_id as built by DeduplicationAgent is scoped only to a
             # discussion_id, which is not unique across companies - rescope
@@ -115,17 +135,20 @@ def run(company_id: str) -> dict:
         platforms = {d.platform for d in canonical_discussions}
         corroboration = len(platforms) / len(canonical_discussions) if canonical_discussions else 0.0
 
-        credibility_score = CredibilityAgent().run(
-            CredibilityInputs(
-                source_history_score=_NEUTRAL_PLACEHOLDER,
-                author_identity_consistency=_NEUTRAL_PLACEHOLDER,
-                evidence_quality=_NEUTRAL_PLACEHOLDER,
-                originality=originality,
-                specialization=_NEUTRAL_PLACEHOLDER,
-                engagement_authenticity=_NEUTRAL_PLACEHOLDER,
-                corroboration=corroboration,
+        credibility_score = step(
+            "Credibility",
+            lambda: CredibilityAgent().run(
+                CredibilityInputs(
+                    source_history_score=_NEUTRAL_PLACEHOLDER,
+                    author_identity_consistency=_NEUTRAL_PLACEHOLDER,
+                    evidence_quality=_NEUTRAL_PLACEHOLDER,
+                    originality=originality,
+                    specialization=_NEUTRAL_PLACEHOLDER,
+                    engagement_authenticity=_NEUTRAL_PLACEHOLDER,
+                    corroboration=corroboration,
+                ),
+                context,
             ),
-            context,
         )
         repository.update_company_credibility(session, company_id, credibility_score)
 
@@ -136,17 +159,17 @@ def run(company_id: str) -> dict:
         for cluster in topic_clusters:
             # topic_id/narrative_id as built by the agents are scoped only
             # to a discussion_id, not unique across companies - rescope here.
-            topic = TopicAgent().run(cluster, context)
+            topic = step("Topic", lambda: TopicAgent().run(cluster, context))
             topic.company_id = company_id
             topic.topic_id = f"{company_id}:{topic.topic_id}"
             repository.save_topic(session, company_id, topic)
 
-            narrative = NarrativeAgent().run(cluster, context)
+            narrative = step("Narrative", lambda: NarrativeAgent().run(cluster, context))
             narrative.company_id = company_id
             narrative.narrative_id = f"{company_id}:{narrative.narrative_id}"
             repository.save_narrative(session, company_id, narrative)
 
-        risk = RiskAgent().run(canonical_discussions, context)
+        risk = step("Risk", lambda: RiskAgent().run(canonical_discussions, context))
         risk.company_id = company_id
         risk.risk_id = f"{company_id}:{risk.risk_id}"
         repository.save_risk(session, company_id, risk)
@@ -170,18 +193,21 @@ def run(company_id: str) -> dict:
             propagation = 1.0 if d.discussion_id in propagated_canonical_ids else 0.0
 
             impact_scores.append(
-                ImpactAgent().run(
-                    ImpactInputs(
-                        reach=_NEUTRAL_PLACEHOLDER,
-                        engagement=engagement_norm,
-                        author_influence=_NEUTRAL_PLACEHOLDER,
-                        source_credibility=credibility_score,
-                        topic_importance=topic_importance,
-                        velocity=_NEUTRAL_PLACEHOLDER,
-                        propagation=propagation,
-                        originality=_NEUTRAL_PLACEHOLDER,
+                step(
+                    "Impact",
+                    lambda: ImpactAgent().run(
+                        ImpactInputs(
+                            reach=_NEUTRAL_PLACEHOLDER,
+                            engagement=engagement_norm,
+                            author_influence=_NEUTRAL_PLACEHOLDER,
+                            source_credibility=credibility_score,
+                            topic_importance=topic_importance,
+                            velocity=_NEUTRAL_PLACEHOLDER,
+                            propagation=propagation,
+                            originality=_NEUTRAL_PLACEHOLDER,
+                        ),
+                        context,
                     ),
-                    context,
                 )
             )
         avg_impact_score = sum(impact_scores) / len(impact_scores) if impact_scores else 0.0

@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 from datetime import datetime, timezone
+from typing import Callable
 
 from gcia.agents.lane1.claim import ClaimAgent
 from gcia.agents.lane1.emotion import EmotionAgent
@@ -82,13 +83,33 @@ def run(
     source_url: str,
     connector_name: str = "rss",
     limit: int | None = None,
+    on_step: Callable[[str, str, str | None], None] | None = None,
+    on_progress: Callable[[int, int | None], None] | None = None,
 ) -> int:
     """`limit` caps how many raw items from the connector are processed -
     mainly a cost/time control: with a real LLM provider, each item costs
     several model calls (relevance, sentiment, emotion, intent, claim), so
     an unbounded feed (Google News RSS can return 100 items) can take a long
     time on a slow provider (e.g. local Ollama on CPU). None means no cap.
+
+    `on_step(agent_name, status, detail)` and `on_progress(item_number, total)`
+    are optional hooks for a live status view (see gcia.api.run_tracker) -
+    unused by the CLI entrypoint, which just runs quietly to completion.
     """
+
+    def step(name: str, fn: Callable[[], object]) -> object:
+        if on_step:
+            on_step(name, "running", None)
+        try:
+            result = fn()
+        except Exception as exc:
+            if on_step:
+                on_step(name, "error", str(exc))
+            raise
+        if on_step:
+            on_step(name, "done", None)
+        return result
+
     init_db()
     provider = resolve_provider(_NO_KEY_FALLBACK_RESPONSE)
 
@@ -121,30 +142,41 @@ def run(
         for item_number, raw in enumerate(connector.collect(), start=1):
             if limit is not None and item_number > limit:
                 break
-            discussion = normalization.run(raw, context)
+            if on_progress:
+                on_progress(item_number, limit)
+            discussion = step("Normalization", lambda: normalization.run(raw, context))
 
             # Cheap, deterministic Lane 1 steps (NONE tier) run on every item
             # regardless of relevance - they inform storage, not cost.
-            discussion.language = language.run(discussion, context)
-            country, country_confidence = geography.run(discussion, context)
+            discussion.language = step("Language", lambda: language.run(discussion, context))
+            country, country_confidence = step(
+                "Geography", lambda: geography.run(discussion, context)
+            )
             discussion.country = country
             discussion.country_confidence = country_confidence
             if discussion.original_url:
-                discussion.url_status = verification.run(discussion.original_url, context)
+                discussion.url_status = step(
+                    "Verification", lambda: verification.run(discussion.original_url, context)
+                )
+            elif on_step:
+                on_step("Verification", "skipped", "no URL")
 
             repository.upsert_discussion(session, company.company_id, discussion)
 
-            relevance_result = relevance.run((discussion, company), context)
+            relevance_result = step("Relevance", lambda: relevance.run((discussion, company), context))
             repository.save_relevance(session, relevance_result)
             if not relevance_result.is_relevant:
+                if on_step:
+                    for skipped in ("Sentiment", "Emotion", "Intent", "Claim"):
+                        on_step(skipped, "skipped", "not relevant")
                 continue
 
-            sentiment_result = sentiment.run(discussion, context)
+            sentiment_result = step("Sentiment", lambda: sentiment.run(discussion, context))
             repository.save_sentiment(session, sentiment_result)
 
-            emotion_result = emotion.run(discussion, context)
-            intent_result = intent.run(discussion, context)
-            claims = claim.run(discussion, context)
+            emotion_result = step("Emotion", lambda: emotion.run(discussion, context))
+            intent_result = step("Intent", lambda: intent.run(discussion, context))
+            claims = step("Claim", lambda: claim.run(discussion, context))
             for extracted_claim in claims:
                 # claim_id as built by ClaimAgent is scoped only to
                 # discussion_id, which is not unique across companies (two
