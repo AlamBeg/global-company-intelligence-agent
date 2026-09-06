@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -27,6 +28,24 @@ from gcia.common.config import settings
 from gcia.common.context import RunContext
 
 logger = logging.getLogger("gcia.model_gateway")
+
+_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Claude (and other models) sometimes wrap a JSON response in a markdown
+    code fence (```json ... ```) even when explicitly asked for raw JSON -
+    json.loads() chokes on the leading backticks. Worse, a model can also add
+    prose before/after the fence (e.g. an explanation paragraph following the
+    closing ```), so this searches for the fenced block anywhere in the text
+    rather than requiring the whole string to be exactly one, and discards
+    anything outside it. Applied to every provider's raw text before parsing,
+    not just Anthropic's, since this is a model output quirk, not a
+    vendor-specific one.
+    """
+    stripped = text.strip()
+    match = _CODE_FENCE_RE.search(stripped)
+    return match.group(1).strip() if match else stripped
 
 # Anthropic's published per-token pricing changes over time; this is a rough
 # planning estimate for cost budgeting only, not a billing source of truth.
@@ -79,7 +98,7 @@ class AnthropicProvider:
             messages=[{"role": "user", "content": prompt}],
         )
         text = "".join(block.text for block in response.content if block.type == "text")
-        parsed = json.loads(text)
+        parsed = json.loads(_strip_code_fences(text))
         return parsed, response.usage.input_tokens, response.usage.output_tokens
 
 
@@ -110,7 +129,7 @@ class OpenAIProvider:
                 {"role": "user", "content": prompt},
             ],
         )
-        parsed = json.loads(response.choices[0].message.content)
+        parsed = json.loads(_strip_code_fences(response.choices[0].message.content))
         usage = response.usage
         return parsed, usage.prompt_tokens, usage.completion_tokens
 
@@ -142,7 +161,7 @@ class OllamaProvider:
                 {"role": "user", "content": prompt},
             ],
         )
-        parsed = json.loads(response.choices[0].message.content)
+        parsed = json.loads(_strip_code_fences(response.choices[0].message.content))
         usage = response.usage
         input_tokens = usage.prompt_tokens if usage else 0
         output_tokens = usage.completion_tokens if usage else 0
